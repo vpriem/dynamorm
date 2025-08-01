@@ -1,0 +1,67 @@
+package dynamorm
+
+import (
+	"fmt"
+	"strings"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+)
+
+// Condition type for all SK conditions
+type Condition func(string, *dynamodb.QueryInput)
+
+var SkEQ = newCondition("%s = %s")
+var SkNEQ = newCondition("%s <> %s")
+var SkLT = newCondition("%s < %s")
+var SkLTE = newCondition("%s <= %s")
+var SkGT = newCondition("%s > %s")
+var SkGTE = newCondition("%s >= %s")
+var SkBeginsWith = newCondition("begins_with(%s, %s)")
+
+func newCondition(format string) func(interface{}) Condition {
+	return func(value interface{}) Condition {
+		return func(field string, input *dynamodb.QueryInput) {
+			key := fmt.Sprintf(":%s", field)
+			key = uniqueKey(key, input.ExpressionAttributeValues)
+
+			var expr []string
+			if input.KeyConditionExpression != nil {
+				expr = append(expr, *input.KeyConditionExpression)
+			}
+			expr = append(expr, fmt.Sprintf(format, field, key))
+			input.KeyConditionExpression = aws.String(strings.Join(expr, " AND "))
+
+			if input.ExpressionAttributeValues == nil {
+				input.ExpressionAttributeValues = map[string]types.AttributeValue{}
+			}
+
+			switch v := value.(type) {
+			case string:
+				input.ExpressionAttributeValues[key] = &types.AttributeValueMemberS{Value: v}
+			case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64:
+				input.ExpressionAttributeValues[key] = &types.AttributeValueMemberN{Value: fmt.Sprintf("%v", v)}
+			case bool:
+				input.ExpressionAttributeValues[key] = &types.AttributeValueMemberBOOL{Value: v}
+			default:
+				input.ExpressionAttributeValues[key] = &types.AttributeValueMemberS{Value: fmt.Sprintf("%v", v)}
+			}
+		}
+	}
+}
+
+func uniqueKey(key string, expressionValues map[string]types.AttributeValue) string {
+	if _, exists := expressionValues[key]; !exists {
+		return key
+	}
+
+	counter := 1
+	for {
+		newKey := fmt.Sprintf("%s%d", key, counter)
+		if _, exists := expressionValues[newKey]; !exists {
+			return newKey
+		}
+		counter++
+	}
+}
