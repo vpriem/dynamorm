@@ -26,11 +26,17 @@ func newFilter(format string) func(string, interface{}) Filter {
 			key := fmt.Sprintf(":%s", field)
 			key = uniqueKey(key, input.ExpressionAttributeValues)
 
+			name := fmt.Sprintf("#%s", field)
+			if input.ExpressionAttributeNames == nil {
+				input.ExpressionAttributeNames = map[string]string{}
+			}
+			input.ExpressionAttributeNames[name] = field
+
 			var expr []string
 			if input.FilterExpression != nil {
 				expr = append(expr, *input.FilterExpression)
 			}
-			expr = append(expr, fmt.Sprintf(format, field, key))
+			expr = append(expr, fmt.Sprintf(format, name, key))
 			input.FilterExpression = aws.String(strings.Join(expr, " AND "))
 
 			if input.ExpressionAttributeValues == nil {

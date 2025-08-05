@@ -410,11 +410,14 @@ func TestStorageQuery(t *testing.T) {
 			Query(context.TODO(), &dynamodb.QueryInput{
 				TableName:              aws.String("TestTable"),
 				KeyConditionExpression: aws.String("PK = :PK AND begins_with(SK, :SK)"),
-				FilterExpression:       aws.String("IsActive = :IsActive"),
+				FilterExpression:       aws.String("#IsActive = :IsActive"),
 				ExpressionAttributeValues: map[string]types.AttributeValue{
 					":PK":       &types.AttributeValueMemberS{Value: "pk-value"},
 					":SK":       &types.AttributeValueMemberS{Value: "sk-value"},
 					":IsActive": &types.AttributeValueMemberBOOL{Value: true},
+				},
+				ExpressionAttributeNames: map[string]string{
+					"#IsActive": "IsActive",
 				},
 			}).
 			Return(out, nil)

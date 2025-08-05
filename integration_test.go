@@ -123,5 +123,13 @@ func TestIntegration(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, int32(2), query.Count())
 		})
+
+		t.Run("should find all delivered orders by customer id using filter", func(t *testing.T) {
+			query, err := storage.QueryGSI1(context.TODO(), fmt.Sprintf("CUSTOMER#%s", cust.Id),
+				dynamorm.SkBeginsWith("ORDER#STATUS"),
+				dynamorm.EQ("Status", "delivered"))
+			require.NoError(t, err)
+			require.Equal(t, int32(2), query.Count())
+		})
 	})
 }
