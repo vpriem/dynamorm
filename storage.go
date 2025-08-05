@@ -36,12 +36,12 @@ type StorageInterface interface {
 	// QueryGSI1 performs a query operation on a Global Secondary Index 1.
 	// An optional SK condition can be provided as well as filters
 	// It returns a QueryInterface for iterating through the results.
-	QueryGSI1(ctx context.Context, string, pkValue string, skCond Condition, filters ...Filter) (QueryInterface, error)
+	QueryGSI1(ctx context.Context, pkValue string, skCond Condition, filters ...Filter) (QueryInterface, error)
 
 	// QueryGSI2 performs a query operation on a Global Secondary Index 2.
 	// An optional SK condition can be provided as well as filters
 	// It returns a QueryInterface for iterating through the results.
-	QueryGSI2(ctx context.Context, string, pkValue string, skCond Condition, filters ...Filter) (QueryInterface, error)
+	QueryGSI2(ctx context.Context, pkValue string, skCond Condition, filters ...Filter) (QueryInterface, error)
 
 	// Save persists one or more entities to DynamoDB.
 	// Call entity.PkSk() to populate PK and SK.

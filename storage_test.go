@@ -21,6 +21,10 @@ func TestStorageSave(t *testing.T) {
 	enc := NewMockEncoderInterface(ctrl)
 	storage := dynamorm.NewStorage("TestTable", dynamo, dynamorm.WithEncoder(enc))
 
+	t.Run("should ensure interface", func(t *testing.T) {
+		var _ dynamorm.StorageInterface = storage
+	})
+
 	t.Run("should save entity none", func(t *testing.T) {
 		err := storage.Save(context.TODO())
 		require.NoError(t, err)
