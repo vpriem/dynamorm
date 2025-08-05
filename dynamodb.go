@@ -8,6 +8,10 @@ import (
 )
 
 //go:generate mockgen -package=dynamorm_test -destination=dynamodb_mock_test.go . DynamoDB
+
+// DynamoDB defines the interface for interacting with AWS DynamoDB service.
+// This interface abstracts the AWS SDK's DynamoDB client, allowing for easier testing
+// and flexibility in implementation.
 type DynamoDB interface {
 	Query(context.Context, *dynamodb.QueryInput, ...func(*dynamodb.Options)) (*dynamodb.QueryOutput, error)
 	GetItem(context.Context, *dynamodb.GetItemInput, ...func(*dynamodb.Options)) (*dynamodb.GetItemOutput, error)
@@ -18,6 +22,9 @@ type DynamoDB interface {
 	DescribeTable(context.Context, *dynamodb.DescribeTableInput, ...func(*dynamodb.Options)) (*dynamodb.DescribeTableOutput, error)
 }
 
+// WithBaseEndpoint returns a function that configures the DynamoDB client with a custom base endpoint.
+// This is particularly useful for local test integration, allowing you to point the client
+// to a local DynamoDB instance or alternative endpoint.
 func WithBaseEndpoint(endpoint string) func(*dynamodb.Options) {
 	return func(options *dynamodb.Options) {
 		options.BaseEndpoint = aws.String(endpoint)

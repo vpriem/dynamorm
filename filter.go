@@ -9,15 +9,30 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
-// Filter type for all filters
+// Filter is a function that modifies a DynamoDB QueryInput by adding a filter expression.
+// Filters can be used with storage.Query, storage.QueryGSI1, and storage.QueryGSI2 methods
+// to add filter expressions to the query, allowing for more refined query results.
 type Filter func(*dynamodb.QueryInput)
 
+// EQ creates a Filter that adds an equality (=) filter expression to the query
 var EQ = newFilter("%s = %s")
+
+// NEQ creates a Filter that adds a not-equal (<>) filter expression to the query
 var NEQ = newFilter("%s <> %s")
+
+// LT creates a Filter that adds a less-than (<) filter expression to the query
 var LT = newFilter("%s < %s")
+
+// LTE creates a Filter that adds a less-than-or-equal (<=) filter expression to the query
 var LTE = newFilter("%s <= %s")
+
+// GT creates a Filter that adds a greater-than (>) filter expression to the query
 var GT = newFilter("%s > %s")
+
+// GTE creates a Filter that adds a greater-than-or-equal (>=) filter expression to the query
 var GTE = newFilter("%s >= %s")
+
+// BeginsWith creates a Filter that adds a begins_with function filter expression to the query
 var BeginsWith = newFilter("begins_with(%s, %s)")
 
 func newFilter(format string) func(string, interface{}) Filter {

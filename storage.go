@@ -25,33 +25,34 @@ import (
 // It provides methods for retrieving, querying, saving, and removing entities.
 type StorageInterface interface {
 	// Get retrieves an entity from DynamoDB by its partition key (PK) and sort key (SK).
-	// Call entity.PkSk() to determine how to query the entity.
+	// It calls entity.PkSk() to determine how to query the entity.
+	// Returns ErrEntityNotFound if the item doesn't exist in the table.
 	Get(context.Context, Entity) error
 
 	// Query performs a query operation on the table using the partition key (PK).
-	// An optional SK condition can be provided as well as filters
+	// An optional SK condition can be provided to refine the query, as well as additional filters.
 	// It returns a QueryInterface for iterating through the results.
 	Query(ctx context.Context, pkValue string, skCond Condition, filters ...Filter) (QueryInterface, error)
 
-	// QueryGSI1 performs a query operation on a Global Secondary Index 1.
-	// An optional SK condition can be provided as well as filters
+	// QueryGSI1 performs a query operation on the Global Secondary Index 1.
+	// An optional SK condition can be provided to refine the query, as well as additional filters.
 	// It returns a QueryInterface for iterating through the results.
 	QueryGSI1(ctx context.Context, pkValue string, skCond Condition, filters ...Filter) (QueryInterface, error)
 
-	// QueryGSI2 performs a query operation on a Global Secondary Index 2.
-	// An optional SK condition can be provided as well as filters
+	// QueryGSI2 performs a query operation on the Global Secondary Index 2.
+	// An optional SK condition can be provided to refine the query, as well as additional filters.
 	// It returns a QueryInterface for iterating through the results.
 	QueryGSI2(ctx context.Context, pkValue string, skCond Condition, filters ...Filter) (QueryInterface, error)
 
 	// Save persists one or more entities to DynamoDB.
-	// Call entity.PkSk() to populate PK and SK.
-	// Call entity.GSI1() and entity.GSI2() to populate GSI PK and SK.
-	// If multiple entities are provided, a batch operation is performed.
-	// Calls BeforeSave() hook before saving.
+	// It calls entity.PkSk() to populate PK and SK, and entity.GSI1() and entity.GSI2()
+	// to populate GSI PK and SK. If multiple entities are provided, a batch operation is performed.
+	// The BeforeSave() hook is called on each entity before saving.
 	Save(context.Context, ...Entity) error
 
 	// Remove deletes an entity from DynamoDB by its PK/SK.
-	// Call entity.PkSk() to determine how to delete the entity.
+	// It calls entity.PkSk() to determine how to delete the entity.
+	// Returns an error if the operation fails.
 	Remove(context.Context, Entity) error
 }
 

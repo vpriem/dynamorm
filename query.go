@@ -32,6 +32,8 @@ type QueryInterface interface {
 }
 
 // Query implements the QueryInterface for handling DynamoDB query results.
+// It provides methods for iterating through query results, automatic pagination,
+// and decoding items into Go structs.
 type Query struct {
 	client  DynamoDB
 	input   *dynamodb.QueryInput
@@ -41,6 +43,7 @@ type Query struct {
 	mutex   sync.Mutex
 }
 
+// NewQuery creates a new Query instance from the query input and output.
 func NewQuery(client DynamoDB, input *dynamodb.QueryInput, output *dynamodb.QueryOutput, decoder DecoderInterface) *Query {
 	if input == nil {
 		input = &dynamodb.QueryInput{}

@@ -1,10 +1,12 @@
 package dynamorm
 
+// Options contains configuration options for Storage.
 type Options struct {
 	Encoder EncoderInterface
 	Decoder DecoderInterface
 }
 
+// DefaultOptions creates default options for the storage, providing default encoder and decoder.
 func DefaultOptions() *Options {
 	return &Options{
 		Encoder: DefaultEncoder(),
@@ -12,9 +14,10 @@ func DefaultOptions() *Options {
 	}
 }
 
+// Option is a function type that modifies Options for use with NewStorage().
 type Option func(*Options)
 
-// WithEncoder provides your own custom marshaling of Go structs to DynamoDB items.
+// WithEncoder provides your own custom encoder when creating a Storage with NewStorage().
 func WithEncoder(e EncoderInterface) Option {
 	return func(cfg *Options) {
 		if e != nil {
@@ -23,7 +26,7 @@ func WithEncoder(e EncoderInterface) Option {
 	}
 }
 
-// WithDecoder provides your own custom unmarshaling of Go structs from DynamoDB items.
+// WithDecoder provides your own custom decoder when creating a Storage with NewStorage().
 func WithDecoder(d DecoderInterface) Option {
 	return func(cfg *Options) {
 		if d != nil {
