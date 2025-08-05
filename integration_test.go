@@ -81,14 +81,12 @@ func TestIntegration(t *testing.T) {
 			require.Equal(t, int32(3), query.Count())
 
 			var orders []*Order
-			for query.Next(context.TODO()) {
+			for query.Next() {
 				ord := &Order{}
 				err = query.Decode(ord)
 				require.NoError(t, err)
 				orders = append(orders, ord)
 			}
-			require.NoError(t, query.Error())
-
 			require.Equal(t, 3, len(orders))
 		})
 

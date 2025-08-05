@@ -150,21 +150,41 @@ query, err := storage.QueryGSI1(ctx, "USER#EMAIL", dynamorm.SkBeginsWith("john")
 
 #### Query Iterator
 
-When the current batch of query results is exhausted, `Next()` automatically fetches the next batch using the `LastEvaluatedKey`.
+DynamoDB paginates query results by design. The `Next()` method iterates only through the current page of results.
+Similarly, the `Reset()` method only resets the iterator for the current page.
 
 ```go
-// Iterate through all results using automatic pagination
-var users []*User
-for query.Next(ctx) {
+// Iterate through all items of current query result
+for query.Next() {
     user := &User{}
-    err := query.Decode(user)
-    if err != nil {
+    if err := query.Decode(user); err != nil {
         // Handle decode error
+        break
     }
-    users = append(users, user)
+    // Process item
 }
-if err := query.Error(); err != nil {
-    // Handle query error
+```
+
+To retrieve additional results, call `NextPage(ctx)`. This method returns a boolean indicating whether more pages exist and an error if the query fails.
+
+```go
+// Iterate through all items across all pages
+for {
+    // Process current page
+    for query.Next() {
+        // Process item
+    }
+
+    // Fetch next page
+    hasMore, err := query.NextPage(ctx)
+    if err != nil {
+        // Handle query error
+        break
+    }
+    if !hasMore {
+        // No more pages to fetch
+        break
+    }
 }
 ```
 

@@ -12,15 +12,22 @@ import (
 	"go.uber.org/mock/gomock"
 )
 
+func TestQueryInterface(t *testing.T) {
+	q := dynamorm.NewQuery(nil, nil, nil, nil)
+	var _ dynamorm.QueryInterface = q
+}
+
 func TestQueryCount(t *testing.T) {
-	q := dynamorm.NewQuery(nil, nil, &dynamodb.QueryOutput{
+	q := dynamorm.NewQuery(nil, nil, nil, nil)
+	require.Equal(t, int32(0), q.Count())
+	require.Equal(t, int32(0), q.ScannedCount())
+
+	q = dynamorm.NewQuery(nil, nil, &dynamodb.QueryOutput{
 		Count:        5,
 		ScannedCount: 10,
-		Items:        []map[string]types.AttributeValue{{}, {}, {}},
 	}, nil)
 	require.Equal(t, int32(5), q.Count())
 	require.Equal(t, int32(10), q.ScannedCount())
-	require.Equal(t, 3, q.TotalCount())
 }
 
 func TestQueryFirst(t *testing.T) {
@@ -108,8 +115,6 @@ func TestQueryIterator(t *testing.T) {
 		},
 	}
 
-	ctx := context.TODO()
-
 	t.Run("should iterate through all items", func(t *testing.T) {
 		query := dynamorm.NewQuery(dynamo, in, out, dec)
 
@@ -119,15 +124,14 @@ func TestQueryIterator(t *testing.T) {
 
 		var customers []*Customer
 
-		for query.Next(ctx) {
+		for query.Next() {
 			cust := &Customer{}
 			err := query.Decode(cust)
 			require.NoError(t, err)
 			customers = append(customers, cust)
 		}
-		require.NoError(t, query.Error())
 
-		require.False(t, query.Next(ctx))
+		require.False(t, query.Next())
 		require.Equal(t, 3, len(customers))
 	})
 
@@ -137,24 +141,22 @@ func TestQueryIterator(t *testing.T) {
 		err := query.Decode(&Customer{})
 		require.ErrorIs(t, err, dynamorm.ErrIndexOutOfRange)
 
-		for query.Next(ctx) {
+		for query.Next() {
 		}
-		require.NoError(t, query.Error())
 
-		require.False(t, query.Next(ctx))
+		require.False(t, query.Next())
 		err = query.Decode(&Customer{})
 		require.ErrorIs(t, err, dynamorm.ErrIndexOutOfRange)
 	})
 
 	t.Run("should reset", func(t *testing.T) {
 		query := dynamorm.NewQuery(dynamo, in, out, dec)
-		for query.Next(ctx) {
+		for query.Next() {
 		}
-		require.NoError(t, query.Error())
 
-		require.False(t, query.Next(ctx))
+		require.False(t, query.Next())
 		query.Reset()
-		require.True(t, query.Next(ctx))
+		require.True(t, query.Next())
 	})
 
 	t.Run("should return decode error", func(t *testing.T) {
@@ -162,7 +164,7 @@ func TestQueryIterator(t *testing.T) {
 
 		dec.EXPECT().Decode(gomock.Any(), gomock.Any()).Return(assert.AnError)
 
-		require.True(t, query.Next(ctx))
+		require.True(t, query.Next())
 		err := query.Decode(&Customer{})
 		require.ErrorIs(t, err, assert.AnError)
 	})
@@ -209,15 +211,22 @@ func TestQueryPagination(t *testing.T) {
 
 		var customers []*Customer
 
-		for query.Next(ctx) {
-			cust := &Customer{}
-			err := query.Decode(cust)
+		for {
+			for query.Next() {
+				cust := &Customer{}
+				err := query.Decode(cust)
+				require.NoError(t, err)
+				customers = append(customers, cust)
+			}
+
+			hasMore, err := query.NextPage(ctx)
 			require.NoError(t, err)
-			customers = append(customers, cust)
+			if !hasMore {
+				break
+			}
 		}
-		require.NoError(t, query.Error())
+
 		require.Equal(t, int32(1), query.Count())
-		require.Equal(t, 5, query.TotalCount())
 		require.Equal(t, 5, len(customers))
 	})
 
@@ -230,17 +239,22 @@ func TestQueryPagination(t *testing.T) {
 
 		var customers []*Customer
 
-		for query.Next(ctx) {
-			cust := &Customer{}
-			err := query.Decode(cust)
-			require.NoError(t, err)
-			customers = append(customers, cust)
-		}
-		require.ErrorIs(t, query.Error(), assert.AnError)
-		require.Equal(t, 3, query.TotalCount())
-		require.Equal(t, 3, len(customers))
+		for {
+			for query.Next() {
+				cust := &Customer{}
+				err := query.Decode(cust)
+				require.NoError(t, err)
+				customers = append(customers, cust)
+			}
 
-		query.Reset()
-		require.NoError(t, query.Error())
+			hasMore, err := query.NextPage(ctx)
+			require.ErrorIs(t, err, assert.AnError)
+			require.False(t, hasMore)
+			if !hasMore {
+				break
+			}
+		}
+
+		require.Equal(t, 3, len(customers))
 	})
 }
