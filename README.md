@@ -144,8 +144,18 @@ if err != nil {
     }
 }
 
-// Query with filter conditions GSI1PK=USER#EMAIL begins_with(GSI1SK, john@doe.com) Name=John Doe
-query, err := storage.QueryGSI1(ctx, "USER#EMAIL", dynamorm.SkBeginsWith("john"), dynamorm.EQ("Name", "John Doe"))
+// Query with filter conditions GSI1PK=USER#EMAIL begins_with(GSI1SK, "john@") Name="John Doe"
+query, err := storage.QueryGSI1(ctx, "USER#EMAIL",
+	dynamorm.SkBeginsWith("john@"),
+	dynamorm.EQ("Name", "John Doe"))
+
+// Query with filter conditions GSI1PK=USER#EMAIL begins_with(GSI1SK, "john@") Name="John Doe" OR Name="Jane Doe"
+query, err := storage.QueryGSI1(ctx, "USER#EMAIL",
+	dynamorm.SkBeginsWith("john@"),
+    dynamorm.OR(
+        dynamorm.EQ("Name", "John Doe"),
+        dynamorm.EQ("Name", "Jane Doe"),
+    ))
 ```
 
 #### Query Iterator

@@ -72,8 +72,16 @@ func uniqueKey(key string, expressionValues map[string]types.AttributeValue) str
 	}
 
 	counter := 1
+
+	prefixToFind := key + "_"
+	for k := range expressionValues {
+		if strings.HasPrefix(k, prefixToFind) {
+			counter++
+		}
+	}
+
 	for {
-		newKey := fmt.Sprintf("%s%d", key, counter)
+		newKey := fmt.Sprintf("%s_%d", key, counter)
 		if _, exists := expressionValues[newKey]; !exists {
 			return newKey
 		}

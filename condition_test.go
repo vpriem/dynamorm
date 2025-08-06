@@ -96,10 +96,10 @@ func TestCondition(t *testing.T) {
 				SkEQ("value1")(field, input)
 			},
 			field:        "SK",
-			expectedExpr: "SK = :SK AND SK = :SK1",
+			expectedExpr: "SK = :SK AND SK = :SK_1",
 			expectedValues: map[string]types.AttributeValue{
-				":SK":  &types.AttributeValueMemberS{Value: "value0"},
-				":SK1": &types.AttributeValueMemberS{Value: "value1"},
+				":SK":   &types.AttributeValueMemberS{Value: "value0"},
+				":SK_1": &types.AttributeValueMemberS{Value: "value1"},
 			},
 		},
 	}

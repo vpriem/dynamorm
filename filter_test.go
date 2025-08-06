@@ -128,14 +128,14 @@ func TestFilter(t *testing.T) {
 				EQ("PK", "value1")(input)
 				EQ("PK", "value2")(input)
 			},
-			expectedExpr: "#PK = :PK AND #PK = :PK1 AND #PK = :PK2",
+			expectedExpr: "#PK = :PK AND #PK = :PK_1 AND #PK = :PK_2",
 			expectedValues: map[string]types.AttributeValue{
-				":PK":  &types.AttributeValueMemberS{Value: "value0"},
-				":PK1": &types.AttributeValueMemberS{Value: "value1"},
-				":PK2": &types.AttributeValueMemberS{Value: "value2"},
+				":PK":   &types.AttributeValueMemberS{Value: "value0"},
+				":PK_1": &types.AttributeValueMemberS{Value: "value1"},
+				":PK_2": &types.AttributeValueMemberS{Value: "value2"},
 			},
 			expectedNames: map[string]string{
-				"#Pk": "Pk",
+				"#PK": "PK",
 			},
 		},
 	}
@@ -144,8 +144,9 @@ func TestFilter(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			input := &dynamodb.QueryInput{}
 			tt.filter(input)
-			require.Equal(t, aws.String(tt.expectedExpr), input.FilterExpression)
+			require.Equal(t, aws.String(tt.expectedExpr), input.FilterExpression, *input.FilterExpression)
 			require.Equal(t, tt.expectedValues, input.ExpressionAttributeValues)
+			require.Equal(t, tt.expectedNames, input.ExpressionAttributeNames)
 		})
 	}
 }

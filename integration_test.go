@@ -48,7 +48,8 @@ func TestIntegration(t *testing.T) {
 		ord1 := &Order{}
 		ord2 := &Order{}
 		ord3 := &Order{}
-		randomize(t, ord1, ord2, ord3)
+		ord4 := &Order{}
+		randomize(t, ord1, ord2, ord3, ord4)
 
 		ord1.CustomerId = cust.Id
 		ord1.Status = "payed"
@@ -62,7 +63,11 @@ func TestIntegration(t *testing.T) {
 		ord3.Status = "delivered"
 		ord3.OrderedAt = time.Now().Add(-2 * 24 * time.Hour)
 
-		err = storage.Save(context.TODO(), ord1, ord2, ord3)
+		ord4.CustomerId = cust.Id
+		ord4.Status = "cancelled"
+		ord4.OrderedAt = time.Now()
+
+		err = storage.Save(context.TODO(), ord1, ord2, ord3, ord4)
 		require.NoError(t, err)
 
 		t.Run("should find customer by id", func(t *testing.T) {
@@ -78,7 +83,7 @@ func TestIntegration(t *testing.T) {
 			query, err := storage.QueryGSI1(context.TODO(), fmt.Sprintf("CUSTOMER#%s", cust.Id),
 				dynamorm.SkBeginsWith("ORDER#"))
 			require.NoError(t, err)
-			require.Equal(t, int32(3), query.Count())
+			require.Equal(t, int32(4), query.Count())
 
 			var orders []*Order
 			for query.Next() {
@@ -87,7 +92,7 @@ func TestIntegration(t *testing.T) {
 				require.NoError(t, err)
 				orders = append(orders, ord)
 			}
-			require.Equal(t, 3, len(orders))
+			require.Equal(t, 4, len(orders))
 		})
 
 		t.Run("should find all past orders by customer id", func(t *testing.T) {
@@ -126,6 +131,17 @@ func TestIntegration(t *testing.T) {
 			query, err := storage.QueryGSI1(context.TODO(), fmt.Sprintf("CUSTOMER#%s", cust.Id),
 				dynamorm.SkBeginsWith("ORDER#STATUS"),
 				dynamorm.EQ("Status", "delivered"))
+			require.NoError(t, err)
+			require.Equal(t, int32(2), query.Count())
+		})
+
+		t.Run("should find all payed or cancelled orders by customer id using filter", func(t *testing.T) {
+			query, err := storage.QueryGSI1(context.TODO(), fmt.Sprintf("CUSTOMER#%s", cust.Id),
+				dynamorm.SkBeginsWith("ORDER#STATUS"),
+				dynamorm.OR(
+					dynamorm.EQ("Status", "payed"),
+					dynamorm.EQ("Status", "cancelled"),
+				))
 			require.NoError(t, err)
 			require.Equal(t, int32(2), query.Count())
 		})
