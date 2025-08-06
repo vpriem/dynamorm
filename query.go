@@ -3,7 +3,6 @@ package dynamorm
 import (
 	"context"
 	"fmt"
-	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
@@ -40,7 +39,6 @@ type Query struct {
 	output  *dynamodb.QueryOutput
 	decoder DecoderInterface
 	index   int
-	mutex   sync.Mutex
 }
 
 // NewQuery creates a new Query instance from the query input and output.
@@ -64,23 +62,14 @@ func NewQuery(client DynamoDB, input *dynamodb.QueryInput, output *dynamodb.Quer
 }
 
 func (q *Query) Count() int32 {
-	q.mutex.Lock()
-	defer q.mutex.Unlock()
-
 	return q.output.Count
 }
 
 func (q *Query) ScannedCount() int32 {
-	q.mutex.Lock()
-	defer q.mutex.Unlock()
-
 	return q.output.ScannedCount
 }
 
 func (q *Query) First(e Entity, conditions ...FindCondition) error {
-	q.mutex.Lock()
-	defer q.mutex.Unlock()
-
 	var foundItem map[string]types.AttributeValue
 
 	if len(conditions) == 0 {
@@ -130,17 +119,11 @@ func FieldValue(field string, value interface{}) FindCondition {
 }
 
 func (q *Query) Next() bool {
-	q.mutex.Lock()
-	defer q.mutex.Unlock()
-
 	q.index++
 	return q.index <= len(q.output.Items)
 }
 
 func (q *Query) NextPage(ctx context.Context) (bool, error) {
-	q.mutex.Lock()
-	defer q.mutex.Unlock()
-
 	if q.output.LastEvaluatedKey == nil {
 		return false, nil
 	}
@@ -158,16 +141,10 @@ func (q *Query) NextPage(ctx context.Context) (bool, error) {
 }
 
 func (q *Query) Reset() {
-	q.mutex.Lock()
-	defer q.mutex.Unlock()
-
 	q.index = 0
 }
 
 func (q *Query) Decode(e Entity) error {
-	q.mutex.Lock()
-	defer q.mutex.Unlock()
-
 	if q.index <= 0 || q.index > len(q.output.Items) {
 		return ErrIndexOutOfRange
 	}
