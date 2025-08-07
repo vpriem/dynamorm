@@ -22,10 +22,12 @@ func TestQueryCount(t *testing.T) {
 	require.Equal(t, int32(0), q.Count())
 	require.Equal(t, int32(0), q.ScannedCount())
 
-	q = dynamorm.NewQuery(nil, nil, &dynamodb.QueryOutput{
+	out := &dynamodb.QueryOutput{
 		Count:        5,
 		ScannedCount: 10,
-	}, nil)
+	}
+	output := dynamorm.NewOutputFromQueryOutput(out)
+	q = dynamorm.NewQuery(nil, nil, output, nil)
 	require.Equal(t, int32(5), q.Count())
 	require.Equal(t, int32(10), q.ScannedCount())
 }
@@ -46,8 +48,9 @@ func TestQueryFirst(t *testing.T) {
 			{"Attr": &types.AttributeValueMemberN{Value: "12.34"}},
 		},
 	}
+	output := dynamorm.NewOutputFromQueryOutput(out)
 
-	query := dynamorm.NewQuery(dynamo, in, out, dec)
+	query := dynamorm.NewQuery(dynamo, in, output, dec)
 
 	cust := &Customer{}
 
@@ -114,9 +117,10 @@ func TestQueryIterator(t *testing.T) {
 			{"Email": &types.AttributeValueMemberS{Value: "usr2@go.dev"}},
 		},
 	}
+	output := dynamorm.NewOutputFromQueryOutput(out)
 
 	t.Run("should iterate through all items", func(t *testing.T) {
-		query := dynamorm.NewQuery(dynamo, in, out, dec)
+		query := dynamorm.NewQuery(dynamo, in, output, dec)
 
 		dec.EXPECT().Decode(out.Items[0], &Customer{}).Return(nil)
 		dec.EXPECT().Decode(out.Items[1], &Customer{}).Return(nil)
@@ -136,7 +140,7 @@ func TestQueryIterator(t *testing.T) {
 	})
 
 	t.Run("should return ErrIndexOutOfRange", func(t *testing.T) {
-		query := dynamorm.NewQuery(dynamo, in, out, dec)
+		query := dynamorm.NewQuery(dynamo, in, output, dec)
 
 		err := query.Decode(&Customer{})
 		require.ErrorIs(t, err, dynamorm.ErrIndexOutOfRange)
@@ -150,7 +154,7 @@ func TestQueryIterator(t *testing.T) {
 	})
 
 	t.Run("should reset", func(t *testing.T) {
-		query := dynamorm.NewQuery(dynamo, in, out, dec)
+		query := dynamorm.NewQuery(dynamo, in, output, dec)
 		for query.Next() {
 		}
 
@@ -160,7 +164,7 @@ func TestQueryIterator(t *testing.T) {
 	})
 
 	t.Run("should return decode error", func(t *testing.T) {
-		query := dynamorm.NewQuery(dynamo, in, out, dec)
+		query := dynamorm.NewQuery(dynamo, in, output, dec)
 
 		dec.EXPECT().Decode(gomock.Any(), gomock.Any()).Return(assert.AnError)
 
@@ -204,7 +208,8 @@ func TestQueryPagination(t *testing.T) {
 	}
 
 	t.Run("should auto paginate", func(t *testing.T) {
-		query := dynamorm.NewQuery(dynamo, in, out1, dec)
+		output := dynamorm.NewOutputFromQueryOutput(out1)
+		query := dynamorm.NewQuery(dynamo, in, output, dec)
 
 		dynamo.EXPECT().Query(ctx, &dynamodb.QueryInput{ExclusiveStartKey: out1.LastEvaluatedKey}).Return(out2, nil)
 		dynamo.EXPECT().Query(ctx, &dynamodb.QueryInput{ExclusiveStartKey: out2.LastEvaluatedKey}).Return(out3, nil)
@@ -231,7 +236,8 @@ func TestQueryPagination(t *testing.T) {
 	})
 
 	t.Run("should return auto paginate error ", func(t *testing.T) {
-		query := dynamorm.NewQuery(dynamo, in, out1, dec)
+		output := dynamorm.NewOutputFromQueryOutput(out1)
+		query := dynamorm.NewQuery(dynamo, in, output, dec)
 
 		dynamo.EXPECT().Query(ctx, &dynamodb.QueryInput{
 			ExclusiveStartKey: out1.LastEvaluatedKey,

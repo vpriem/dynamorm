@@ -36,18 +36,18 @@ type QueryInterface interface {
 type Query struct {
 	client  DynamoDB
 	input   *dynamodb.QueryInput
-	output  *dynamodb.QueryOutput
+	output  *Output
 	decoder DecoderInterface
 	index   int
 }
 
 // NewQuery creates a new Query instance from the query input and output.
-func NewQuery(client DynamoDB, input *dynamodb.QueryInput, output *dynamodb.QueryOutput, decoder DecoderInterface) *Query {
+func NewQuery(client DynamoDB, input *dynamodb.QueryInput, output *Output, decoder DecoderInterface) *Query {
 	if input == nil {
 		input = &dynamodb.QueryInput{}
 	}
 	if output == nil {
-		output = &dynamodb.QueryOutput{}
+		output = &Output{}
 	}
 	if decoder == nil {
 		decoder = DefaultDecoder()
@@ -130,12 +130,12 @@ func (q *Query) NextPage(ctx context.Context) (bool, error) {
 
 	q.input.ExclusiveStartKey = q.output.LastEvaluatedKey
 
-	output, err := q.client.Query(ctx, q.input)
+	out, err := q.client.Query(ctx, q.input)
 	if err != nil {
 		return false, err
 	}
 
-	q.output = output
+	q.output = NewOutputFromQueryOutput(out)
 	q.index = 0
 	return true, nil
 }

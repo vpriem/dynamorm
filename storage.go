@@ -250,10 +250,11 @@ func (s *Storage) query(ctx context.Context, input *dynamodb.QueryInput, filters
 		filter(input)
 	}
 
-	output, err := s.client.Query(ctx, input)
+	out, err := s.client.Query(ctx, input)
 	if err != nil {
 		return nil, err
 	}
+	output := NewOutputFromQueryOutput(out)
 
 	return NewQuery(s.client, input, output, s.decoder), nil
 }
