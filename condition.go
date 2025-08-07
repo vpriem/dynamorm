@@ -5,14 +5,13 @@ import (
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
-// Condition is a function that modifies a DynamoDB QueryInput by adding a key condition expression.
+// Condition is a function that modifies a query Input by adding a key condition expression.
 // Conditions can be used with storage.Query, storage.QueryGSI1, and storage.QueryGSI2 methods
 // to add KeyConditionExpression to the query SK, allowing for more refined query results.
-type Condition func(string, *dynamodb.QueryInput)
+type Condition func(string, *Input)
 
 // SkEQ creates a Condition that adds an equality (=) key condition expression to the query SK
 var SkEQ = newCondition("%s = %s")
@@ -37,7 +36,7 @@ var SkBeginsWith = newCondition("begins_with(%s, %s)")
 
 func newCondition(format string) func(interface{}) Condition {
 	return func(value interface{}) Condition {
-		return func(field string, input *dynamodb.QueryInput) {
+		return func(field string, input *Input) {
 			key := fmt.Sprintf(":%s", field)
 			key = uniqueKey(key, input.ExpressionAttributeValues)
 

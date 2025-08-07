@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
@@ -17,7 +16,7 @@ var AND = createOperator("AND")
 
 func createOperator(op string) func(filters ...Filter) Filter {
 	return func(filters ...Filter) Filter {
-		return func(input *dynamodb.QueryInput) {
+		return func(input *Input) {
 			if input.ExpressionAttributeNames == nil {
 				input.ExpressionAttributeNames = map[string]string{}
 			}
@@ -28,7 +27,7 @@ func createOperator(op string) func(filters ...Filter) Filter {
 			var expressions []string
 
 			for _, filter := range filters {
-				in := &dynamodb.QueryInput{
+				in := &Input{
 					ExpressionAttributeNames:  input.ExpressionAttributeNames,
 					ExpressionAttributeValues: input.ExpressionAttributeValues,
 				}

@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/stretchr/testify/require"
 )
@@ -91,7 +90,7 @@ func TestCondition(t *testing.T) {
 		},
 		{
 			name: "Multiple conditions with same field",
-			condition: func(field string, input *dynamodb.QueryInput) {
+			condition: func(field string, input *Input) {
 				SkEQ("value0")(field, input)
 				SkEQ("value1")(field, input)
 			},
@@ -106,7 +105,7 @@ func TestCondition(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			input := &dynamodb.QueryInput{}
+			input := &Input{}
 			tt.condition(tt.field, input)
 			require.Equal(t, aws.String(tt.expectedExpr), input.KeyConditionExpression)
 			require.Equal(t, tt.expectedValues, input.ExpressionAttributeValues)

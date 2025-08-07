@@ -230,7 +230,7 @@ func (s *Storage) Get(ctx context.Context, e Entity) error {
 }
 
 func (s *Storage) Query(ctx context.Context, pk string, condition Condition, filters ...Filter) (QueryInterface, error) {
-	input := &dynamodb.QueryInput{
+	input := &Input{
 		TableName:              aws.String(s.table),
 		KeyConditionExpression: aws.String("PK = :PK"),
 		ExpressionAttributeValues: map[string]types.AttributeValue{
@@ -245,12 +245,13 @@ func (s *Storage) Query(ctx context.Context, pk string, condition Condition, fil
 	return s.query(ctx, input, filters...)
 }
 
-func (s *Storage) query(ctx context.Context, input *dynamodb.QueryInput, filters ...Filter) (QueryInterface, error) {
+func (s *Storage) query(ctx context.Context, input *Input, filters ...Filter) (QueryInterface, error) {
 	for _, filter := range filters {
 		filter(input)
 	}
 
-	out, err := s.client.Query(ctx, input)
+	in := input.ToQueryInput()
+	out, err := s.client.Query(ctx, in)
 	if err != nil {
 		return nil, err
 	}
@@ -268,7 +269,7 @@ func (s *Storage) QueryGSI2(ctx context.Context, pk string, condition Condition,
 }
 
 func (s *Storage) queryGSI(ctx context.Context, index, pk string, condition Condition, filters ...Filter) (QueryInterface, error) {
-	input := &dynamodb.QueryInput{
+	input := &Input{
 		TableName:              aws.String(s.table),
 		IndexName:              aws.String(index),
 		KeyConditionExpression: aws.String(fmt.Sprintf("%sPK = :%sPK", index, index)),

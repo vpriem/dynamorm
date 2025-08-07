@@ -5,14 +5,13 @@ import (
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
-// Filter is a function that modifies a DynamoDB QueryInput by adding a filter expression.
+// Filter is a function that modifies a query Input by adding a filter expression.
 // Filters can be used with storage.Query, storage.QueryGSI1, and storage.QueryGSI2 methods
 // to add filter expressions to the query, allowing for more refined query results.
-type Filter func(*dynamodb.QueryInput)
+type Filter func(*Input)
 
 // EQ creates a Filter that adds an equality (=) filter expression to the query
 var EQ = newFilter("%s = %s")
@@ -37,7 +36,7 @@ var BeginsWith = newFilter("begins_with(%s, %s)")
 
 func newFilter(format string) func(string, interface{}) Filter {
 	return func(field string, value interface{}) Filter {
-		return func(input *dynamodb.QueryInput) {
+		return func(input *Input) {
 			key := fmt.Sprintf(":%s", field)
 			key = uniqueKey(key, input.ExpressionAttributeValues)
 

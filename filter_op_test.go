@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/stretchr/testify/require"
 )
@@ -78,7 +77,7 @@ func TestORFilter(t *testing.T) {
 		},
 		{
 			name: "AND combined with existing filter",
-			filter: func(input *dynamodb.QueryInput) {
+			filter: func(input *Input) {
 				EQ("Name", "John")(input)
 				OR(GT("Age", 30), LT("Age", 40))(input)
 			},
@@ -108,7 +107,7 @@ func TestORFilter(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			input := &dynamodb.QueryInput{}
+			input := &Input{}
 			tt.filter(input)
 			require.Equal(t, aws.String(tt.expectedExpr), input.FilterExpression, *input.FilterExpression)
 			require.Equal(t, tt.expectedValues, input.ExpressionAttributeValues)

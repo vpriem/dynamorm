@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/stretchr/testify/require"
 )
@@ -107,7 +106,7 @@ func TestFilter(t *testing.T) {
 		},
 		{
 			name: "Multiple conditions",
-			filter: func(input *dynamodb.QueryInput) {
+			filter: func(input *Input) {
 				EQ("Name", "John")(input)
 				BeginsWith("SK", "PROFILE#")(input)
 			},
@@ -123,7 +122,7 @@ func TestFilter(t *testing.T) {
 		},
 		{
 			name: "Unique keys for same field",
-			filter: func(input *dynamodb.QueryInput) {
+			filter: func(input *Input) {
 				EQ("PK", "value0")(input)
 				EQ("PK", "value1")(input)
 				EQ("PK", "value2")(input)
@@ -142,7 +141,7 @@ func TestFilter(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			input := &dynamodb.QueryInput{}
+			input := &Input{}
 			tt.filter(input)
 			require.Equal(t, aws.String(tt.expectedExpr), input.FilterExpression, *input.FilterExpression)
 			require.Equal(t, tt.expectedValues, input.ExpressionAttributeValues)

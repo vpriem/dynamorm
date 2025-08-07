@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
@@ -35,16 +34,16 @@ type QueryInterface interface {
 // and decoding items into Go structs.
 type Query struct {
 	client  DynamoDB
-	input   *dynamodb.QueryInput
+	input   *Input
 	output  *Output
 	decoder DecoderInterface
 	index   int
 }
 
 // NewQuery creates a new Query instance from the query input and output.
-func NewQuery(client DynamoDB, input *dynamodb.QueryInput, output *Output, decoder DecoderInterface) *Query {
+func NewQuery(client DynamoDB, input *Input, output *Output, decoder DecoderInterface) *Query {
 	if input == nil {
-		input = &dynamodb.QueryInput{}
+		input = &Input{}
 	}
 	if output == nil {
 		output = &Output{}
@@ -130,7 +129,8 @@ func (q *Query) NextPage(ctx context.Context) (bool, error) {
 
 	q.input.ExclusiveStartKey = q.output.LastEvaluatedKey
 
-	out, err := q.client.Query(ctx, q.input)
+	in := q.input.ToQueryInput()
+	out, err := q.client.Query(ctx, in)
 	if err != nil {
 		return false, err
 	}
