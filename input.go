@@ -1,6 +1,10 @@
 package dynamorm
 
 import (
+	"fmt"
+	"strings"
+
+	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
@@ -17,6 +21,34 @@ type Input struct {
 	KeyConditionExpression    *string
 	Limit                     *int32
 	IsScan                    bool
+}
+
+func (i *Input) refField(name string) string {
+	if i.ExpressionAttributeNames == nil {
+		i.ExpressionAttributeNames = map[string]string{}
+	}
+
+	ref := fmt.Sprintf("#%s", name)
+	i.ExpressionAttributeNames[ref] = name
+	return ref
+}
+
+func (i *Input) refFieldValue(name string, value interface{}) string {
+	ref := fmt.Sprintf(":%s", name)
+	ref = uniqueRef(ref, i.ExpressionAttributeValues)
+
+	if i.ExpressionAttributeValues == nil {
+		i.ExpressionAttributeValues = map[string]types.AttributeValue{}
+	}
+
+	av, err := attributevalue.Marshal(value)
+	if err != nil {
+		i.ExpressionAttributeValues[ref] = &types.AttributeValueMemberS{Value: fmt.Sprintf("%v", value)}
+	} else {
+		i.ExpressionAttributeValues[ref] = av
+	}
+
+	return ref
 }
 
 // ToQueryInput converts the library's Input type to an AWS SDK DynamoDB QueryInput.
@@ -51,5 +83,28 @@ func (i *Input) ToScanInput() *dynamodb.ScanInput {
 		FilterExpression:          i.FilterExpression,
 		IndexName:                 i.IndexName,
 		Limit:                     i.Limit,
+	}
+}
+
+func uniqueRef(ref string, values map[string]types.AttributeValue) string {
+	if _, exists := values[ref]; !exists {
+		return ref
+	}
+
+	counter := 1
+
+	prefixToFind := ref + "_"
+	for k := range values {
+		if strings.HasPrefix(k, prefixToFind) {
+			counter++
+		}
+	}
+
+	for {
+		newRef := fmt.Sprintf("%s_%d", ref, counter)
+		if _, exists := values[newRef]; !exists {
+			return newRef
+		}
+		counter++
 	}
 }

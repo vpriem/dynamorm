@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
 // Condition is a function that modifies a query Input by adding a key condition expression.
@@ -37,53 +36,15 @@ var SkBeginsWith = newCondition("begins_with(%s, %s)")
 func newCondition(format string) func(interface{}) Condition {
 	return func(value interface{}) Condition {
 		return func(field string, input *Input) {
-			key := fmt.Sprintf(":%s", field)
-			key = uniqueKey(key, input.ExpressionAttributeValues)
+			valueRef := input.refFieldValue(field, value)
 
 			var expr []string
-			if input.KeyConditionExpression != nil {
+			if input.KeyConditionExpression != nil && *input.KeyConditionExpression != "" {
 				expr = append(expr, *input.KeyConditionExpression)
 			}
-			expr = append(expr, fmt.Sprintf(format, field, key))
+			expr = append(expr, fmt.Sprintf(format, field, valueRef))
+
 			input.KeyConditionExpression = aws.String(strings.Join(expr, " AND "))
-
-			if input.ExpressionAttributeValues == nil {
-				input.ExpressionAttributeValues = map[string]types.AttributeValue{}
-			}
-
-			switch v := value.(type) {
-			case string:
-				input.ExpressionAttributeValues[key] = &types.AttributeValueMemberS{Value: v}
-			case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64:
-				input.ExpressionAttributeValues[key] = &types.AttributeValueMemberN{Value: fmt.Sprintf("%v", v)}
-			case bool:
-				input.ExpressionAttributeValues[key] = &types.AttributeValueMemberBOOL{Value: v}
-			default:
-				input.ExpressionAttributeValues[key] = &types.AttributeValueMemberS{Value: fmt.Sprintf("%v", v)}
-			}
 		}
-	}
-}
-
-func uniqueKey(key string, expressionValues map[string]types.AttributeValue) string {
-	if _, exists := expressionValues[key]; !exists {
-		return key
-	}
-
-	counter := 1
-
-	prefixToFind := key + "_"
-	for k := range expressionValues {
-		if strings.HasPrefix(k, prefixToFind) {
-			counter++
-		}
-	}
-
-	for {
-		newKey := fmt.Sprintf("%s_%d", key, counter)
-		if _, exists := expressionValues[newKey]; !exists {
-			return newKey
-		}
-		counter++
 	}
 }

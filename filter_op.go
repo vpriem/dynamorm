@@ -44,7 +44,7 @@ func createOperator(op string) func(filters ...Filter) Filter {
 				if len(expressions) > 1 {
 					expr = fmt.Sprintf("(%s)", expr)
 				}
-				if input.FilterExpression != nil {
+				if input.FilterExpression != nil && *input.FilterExpression != "" {
 					expr = fmt.Sprintf("%s AND %s", *input.FilterExpression, expr)
 				}
 				input.FilterExpression = aws.String(expr)

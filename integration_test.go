@@ -39,6 +39,8 @@ func TestIntegration(t *testing.T) {
 			}
 		})
 
+		now := time.Now()
+
 		cust := &Customer{}
 		randomize(t, cust)
 		cust.Disabled = false
@@ -53,19 +55,19 @@ func TestIntegration(t *testing.T) {
 
 		ord1.CustomerId = cust.Id
 		ord1.Status = "payed"
-		ord1.OrderedAt = time.Now()
+		ord1.OrderedAt = now
 
 		ord2.CustomerId = cust.Id
 		ord2.Status = "delivered"
-		ord2.OrderedAt = time.Now().Add(-1 * 24 * time.Hour)
+		ord2.OrderedAt = now.Add(-1 * 24 * time.Hour)
 
 		ord3.CustomerId = cust.Id
 		ord3.Status = "delivered"
-		ord3.OrderedAt = time.Now().Add(-2 * 24 * time.Hour)
+		ord3.OrderedAt = now.Add(-2 * 24 * time.Hour)
 
 		ord4.CustomerId = cust.Id
 		ord4.Status = "cancelled"
-		ord4.OrderedAt = time.Now()
+		ord4.OrderedAt = now
 
 		err = storage.Save(context.TODO(), ord1, ord2, ord3, ord4)
 		require.NoError(t, err)
@@ -98,7 +100,7 @@ func TestIntegration(t *testing.T) {
 		t.Run("should find all past orders by customer id", func(t *testing.T) {
 			query, err := storage.QueryGSI1(context.TODO(), fmt.Sprintf("CUSTOMER#%s", cust.Id),
 				dynamorm.SkBeginsWith("ORDER#"),
-				dynamorm.LT("OrderedAt", time.Now().Add(-1*24*time.Hour)))
+				dynamorm.LT("OrderedAt", now.Add(-1*24*time.Hour)))
 			require.NoError(t, err)
 			require.Equal(t, int32(1), query.Count())
 
