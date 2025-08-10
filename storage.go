@@ -44,6 +44,21 @@ type StorageInterface interface {
 	// It returns a QueryInterface for iterating through the results.
 	QueryGSI2(ctx context.Context, pkValue string, skCond Condition, filters ...Filter) (QueryInterface, error)
 
+	// Scan performs a scan operation on the table.
+	// Optional filters can be provided to refine the scan.
+	// It returns a QueryInterface for iterating through the results.
+	Scan(ctx context.Context, filters ...Filter) (QueryInterface, error)
+
+	// ScanGSI1 performs a scan operation on the Global Secondary Index 1.
+	// Optional filters can be provided to refine the scan.
+	// It returns a QueryInterface for iterating through the results.
+	ScanGSI1(ctx context.Context, filters ...Filter) (QueryInterface, error)
+
+	// ScanGSI2 performs a scan operation on the Global Secondary Index 2.
+	// Optional filters can be provided to refine the scan.
+	// It returns a QueryInterface for iterating through the results.
+	ScanGSI2(ctx context.Context, filters ...Filter) (QueryInterface, error)
+
 	// Save persists one or more entities to DynamoDB.
 	// It calls entity.PkSk() to populate PK and SK, and entity.GSI1() and entity.GSI2()
 	// to populate GSI PK and SK. If multiple entities are provided, a batch operation is performed.
@@ -283,6 +298,47 @@ func (s *Storage) queryGSI(ctx context.Context, index, pk string, condition Cond
 	}
 
 	return s.query(ctx, input, filters...)
+}
+
+func (s *Storage) Scan(ctx context.Context, filters ...Filter) (QueryInterface, error) {
+	input := &Input{
+		TableName: aws.String(s.table),
+	}
+
+	return s.scan(ctx, input, filters...)
+}
+
+func (s *Storage) ScanGSI1(ctx context.Context, filters ...Filter) (QueryInterface, error) {
+	return s.scanGSI(ctx, "GSI1", filters...)
+}
+
+func (s *Storage) ScanGSI2(ctx context.Context, filters ...Filter) (QueryInterface, error) {
+	return s.scanGSI(ctx, "GSI2", filters...)
+}
+
+func (s *Storage) scan(ctx context.Context, input *Input, filters ...Filter) (QueryInterface, error) {
+	for _, filter := range filters {
+		filter(input)
+	}
+
+	input.IsScan = true
+	in := input.ToScanInput()
+	out, err := s.client.Scan(ctx, in)
+	if err != nil {
+		return nil, err
+	}
+	output := NewOutputFromScanOutput(out)
+
+	return NewQuery(s.client, input, output, s.decoder), nil
+}
+
+func (s *Storage) scanGSI(ctx context.Context, index string, filters ...Filter) (QueryInterface, error) {
+	input := &Input{
+		TableName: aws.String(s.table),
+		IndexName: aws.String(index),
+	}
+
+	return s.scan(ctx, input, filters...)
 }
 
 func (s *Storage) Remove(ctx context.Context, e Entity) error {

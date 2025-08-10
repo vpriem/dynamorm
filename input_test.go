@@ -10,7 +10,7 @@ import (
 	"github.com/vpriem/dynamorm"
 )
 
-func TestNewInputFromQueryInput(t *testing.T) {
+func TestToQueryInput(t *testing.T) {
 	in := &dynamodb.QueryInput{
 		TableName:                 aws.String("table"),
 		ExclusiveStartKey:         map[string]types.AttributeValue{"start": &types.AttributeValueMemberS{Value: "key"}},
@@ -22,8 +22,7 @@ func TestNewInputFromQueryInput(t *testing.T) {
 		Limit:                     aws.Int32(10),
 	}
 
-	input := dynamorm.NewInputFromQueryInput(in)
-	require.Equal(t, &dynamorm.Input{
+	input := &dynamorm.Input{
 		TableName:                 aws.String("table"),
 		ExclusiveStartKey:         map[string]types.AttributeValue{"start": &types.AttributeValueMemberS{Value: "key"}},
 		ExpressionAttributeNames:  map[string]string{"attr": "attrName"},
@@ -32,7 +31,35 @@ func TestNewInputFromQueryInput(t *testing.T) {
 		IndexName:                 aws.String("index"),
 		KeyConditionExpression:    aws.String("condition"),
 		Limit:                     aws.Int32(10),
-	}, input)
+	}
 
 	require.Equal(t, in, input.ToQueryInput())
+	require.Nil(t, input.ToScanInput())
+}
+
+func TestToScanInput(t *testing.T) {
+	in := &dynamodb.ScanInput{
+		TableName:                 aws.String("table"),
+		ExclusiveStartKey:         map[string]types.AttributeValue{"start": &types.AttributeValueMemberS{Value: "key"}},
+		ExpressionAttributeNames:  map[string]string{"attr": "attrName"},
+		ExpressionAttributeValues: map[string]types.AttributeValue{"attr": &types.AttributeValueMemberS{Value: "value"}},
+		FilterExpression:          aws.String("filter"),
+		IndexName:                 aws.String("index"),
+		Limit:                     aws.Int32(10),
+	}
+
+	input := &dynamorm.Input{
+		TableName:                 aws.String("table"),
+		ExclusiveStartKey:         map[string]types.AttributeValue{"start": &types.AttributeValueMemberS{Value: "key"}},
+		ExpressionAttributeNames:  map[string]string{"attr": "attrName"},
+		ExpressionAttributeValues: map[string]types.AttributeValue{"attr": &types.AttributeValueMemberS{Value: "value"}},
+		FilterExpression:          aws.String("filter"),
+		IndexName:                 aws.String("index"),
+		KeyConditionExpression:    aws.String("condition"),
+		Limit:                     aws.Int32(10),
+		IsScan:                    true,
+	}
+
+	require.Equal(t, in, input.ToScanInput())
+	require.Nil(t, input.ToQueryInput())
 }

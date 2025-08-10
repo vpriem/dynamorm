@@ -176,12 +176,10 @@ func TestQueryPagination(t *testing.T) {
 	t.Cleanup(ctrl.Finish)
 
 	dynamo := NewMockDynamoDB(ctrl)
-	dec := NewMockDecoderInterface(ctrl)
-	dec.EXPECT().Decode(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 	ctx := context.TODO()
 
 	in := &dynamorm.Input{
-		IndexName: aws.String("Idx"),
+		TableName: aws.String("Table"),
 	}
 
 	out1 := &dynamodb.QueryOutput{
@@ -191,12 +189,16 @@ func TestQueryPagination(t *testing.T) {
 			{"Email": &types.AttributeValueMemberS{Value: "usr1@go.dev"}},
 			{"Email": &types.AttributeValueMemberS{Value: "usr2@go.dev"}},
 		},
-		LastEvaluatedKey: map[string]types.AttributeValue{},
+		LastEvaluatedKey: map[string]types.AttributeValue{
+			"lastKey": &types.AttributeValueMemberS{Value: "1"},
+		},
 	}
 	out2 := &dynamodb.QueryOutput{
-		Count:            0,
-		Items:            []map[string]types.AttributeValue{},
-		LastEvaluatedKey: map[string]types.AttributeValue{},
+		Count: 0,
+		Items: []map[string]types.AttributeValue{},
+		LastEvaluatedKey: map[string]types.AttributeValue{
+			"lastKey": &types.AttributeValueMemberS{Value: "2"},
+		},
 	}
 	out3 := &dynamodb.QueryOutput{
 		Count: 1,
@@ -208,29 +210,28 @@ func TestQueryPagination(t *testing.T) {
 
 	t.Run("should auto paginate", func(t *testing.T) {
 		output := dynamorm.NewOutputFromQueryOutput(out1)
-		query := dynamorm.NewQuery(dynamo, in, output, dec)
+		query := dynamorm.NewQuery(dynamo, in, output, nil)
 
 		dynamo.EXPECT().
 			Query(ctx, &dynamodb.QueryInput{
-				IndexName:         aws.String("Idx"),
+				TableName:         aws.String("Table"),
 				ExclusiveStartKey: out1.LastEvaluatedKey,
 			}).
 			Return(out2, nil)
 		dynamo.EXPECT().
 			Query(ctx, &dynamodb.QueryInput{
-				IndexName:         aws.String("Idx"),
+				TableName:         aws.String("Table"),
 				ExclusiveStartKey: out2.LastEvaluatedKey,
 			}).
 			Return(out3, nil)
 
-		var customers []*Customer
-
+		var emails []string
 		for {
 			for query.Next() {
 				cust := &Customer{}
 				err := query.Decode(cust)
 				require.NoError(t, err)
-				customers = append(customers, cust)
+				emails = append(emails, cust.Email)
 			}
 
 			hasMore, err := query.NextPage(ctx)
@@ -241,28 +242,33 @@ func TestQueryPagination(t *testing.T) {
 		}
 
 		require.Equal(t, int32(1), query.Count())
-		require.Equal(t, 5, len(customers))
+		require.Equal(t, []string{
+			"usr0@go.dev",
+			"usr1@go.dev",
+			"usr2@go.dev",
+			"usr3@go.dev",
+			"usr4@go.dev",
+		}, emails)
 	})
 
 	t.Run("should return auto paginate error ", func(t *testing.T) {
 		output := dynamorm.NewOutputFromQueryOutput(out1)
-		query := dynamorm.NewQuery(dynamo, in, output, dec)
+		query := dynamorm.NewQuery(dynamo, in, output, nil)
 
 		dynamo.EXPECT().
 			Query(ctx, &dynamodb.QueryInput{
-				IndexName:         aws.String("Idx"),
+				TableName:         aws.String("Table"),
 				ExclusiveStartKey: out1.LastEvaluatedKey,
 			}).
 			Return(nil, assert.AnError)
 
-		var customers []*Customer
-
+		var emails []string
 		for {
 			for query.Next() {
 				cust := &Customer{}
 				err := query.Decode(cust)
 				require.NoError(t, err)
-				customers = append(customers, cust)
+				emails = append(emails, cust.Email)
 			}
 
 			hasMore, err := query.NextPage(ctx)
@@ -273,6 +279,119 @@ func TestQueryPagination(t *testing.T) {
 			}
 		}
 
-		require.Equal(t, 3, len(customers))
+		require.Equal(t, []string{
+			"usr0@go.dev",
+			"usr1@go.dev",
+			"usr2@go.dev",
+		}, emails)
+	})
+}
+
+func TestScanPagination(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	t.Cleanup(ctrl.Finish)
+
+	dynamo := NewMockDynamoDB(ctrl)
+	ctx := context.TODO()
+
+	in := &dynamorm.Input{
+		TableName: aws.String("Table"),
+		IsScan:    true,
+	}
+
+	out1 := &dynamodb.ScanOutput{
+		Count: 1,
+		Items: []map[string]types.AttributeValue{
+			{"Email": &types.AttributeValueMemberS{Value: "usr0@go.dev"}},
+		},
+		LastEvaluatedKey: map[string]types.AttributeValue{
+			"lastKey": &types.AttributeValueMemberS{Value: "1"},
+		},
+	}
+	out2 := &dynamodb.ScanOutput{
+		Count: 0,
+		Items: []map[string]types.AttributeValue{},
+		LastEvaluatedKey: map[string]types.AttributeValue{
+			"lastKey": &types.AttributeValueMemberS{Value: "2"},
+		},
+	}
+	out3 := &dynamodb.ScanOutput{
+		Count: 1,
+		Items: []map[string]types.AttributeValue{
+			{"Email": &types.AttributeValueMemberS{Value: "usr1@go.dev"}},
+		},
+	}
+
+	t.Run("should auto paginate", func(t *testing.T) {
+		output := dynamorm.NewOutputFromScanOutput(out1)
+		query := dynamorm.NewQuery(dynamo, in, output, nil)
+
+		dynamo.EXPECT().
+			Scan(ctx, &dynamodb.ScanInput{
+				TableName:         aws.String("Table"),
+				ExclusiveStartKey: out1.LastEvaluatedKey,
+			}).
+			Return(out2, nil)
+		dynamo.EXPECT().
+			Scan(ctx, &dynamodb.ScanInput{
+				TableName:         aws.String("Table"),
+				ExclusiveStartKey: out2.LastEvaluatedKey,
+			}).
+			Return(out3, nil)
+
+		var emails []string
+		for {
+			for query.Next() {
+				e := &Customer{}
+				err := query.Decode(e)
+				require.NoError(t, err)
+				emails = append(emails, e.Email)
+			}
+
+			hasMore, err := query.NextPage(ctx)
+			require.NoError(t, err)
+			if !hasMore {
+				break
+			}
+		}
+
+		require.Equal(t, int32(1), query.Count())
+		require.Equal(t, []string{
+			"usr0@go.dev",
+			"usr1@go.dev",
+		}, emails)
+	})
+
+	t.Run("should return auto paginate error ", func(t *testing.T) {
+		output := dynamorm.NewOutputFromScanOutput(out1)
+		query := dynamorm.NewQuery(dynamo, in, output, nil)
+
+		dynamo.EXPECT().
+			Scan(ctx, &dynamodb.ScanInput{
+				TableName:         aws.String("Table"),
+				ExclusiveStartKey: out1.LastEvaluatedKey,
+			}).
+			Return(nil, assert.AnError)
+
+		var emails []string
+		for {
+			for query.Next() {
+				cust := &Customer{}
+				err := query.Decode(cust)
+				require.NoError(t, err)
+				emails = append(emails, cust.Email)
+			}
+
+			hasMore, err := query.NextPage(ctx)
+			require.ErrorIs(t, err, assert.AnError)
+			require.False(t, hasMore)
+			if !hasMore {
+				break
+			}
+		}
+
+		require.Equal(t, []string{
+			"usr0@go.dev",
+		}, emails)
 	})
 }

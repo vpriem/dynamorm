@@ -481,6 +481,181 @@ func TestStorageQuery(t *testing.T) {
 	})
 }
 
+func TestStorageScan(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	t.Cleanup(ctrl.Finish)
+
+	dynamo := NewMockDynamoDB(ctrl)
+	ctx := context.TODO()
+
+	storage := dynamorm.NewStorage("TestTable", dynamo)
+
+	out := &dynamodb.ScanOutput{
+		Count: 1,
+		Items: []map[string]types.AttributeValue{
+			{"Email": &types.AttributeValueMemberS{Value: "usr1@go.dev"}},
+		},
+	}
+
+	t.Run("should scan table", func(t *testing.T) {
+		dynamo.EXPECT().
+			Scan(context.TODO(), &dynamodb.ScanInput{
+				TableName: aws.String("TestTable"),
+			}).
+			Return(out, nil)
+
+		query, err := storage.Scan(ctx)
+		require.NoError(t, err)
+		require.Equal(t, int32(1), query.Count())
+	})
+
+	t.Run("should scan table with filter", func(t *testing.T) {
+		dynamo.EXPECT().
+			Scan(context.TODO(), &dynamodb.ScanInput{
+				TableName:        aws.String("TestTable"),
+				FilterExpression: aws.String("#Email = :Email"),
+				ExpressionAttributeValues: map[string]types.AttributeValue{
+					":Email": &types.AttributeValueMemberS{Value: "usr1@go.dev"},
+				},
+				ExpressionAttributeNames: map[string]string{
+					"#Email": "Email",
+				},
+			}).
+			Return(out, nil)
+
+		query, err := storage.Scan(ctx, dynamorm.EQ("Email", "usr1@go.dev"))
+		require.NoError(t, err)
+		require.Equal(t, int32(1), query.Count())
+	})
+
+	t.Run("should return error", func(t *testing.T) {
+		dynamo.EXPECT().
+			Scan(gomock.Any(), gomock.Any()).
+			Return(nil, assert.AnError)
+
+		_, err := storage.Scan(ctx)
+		require.ErrorIs(t, err, assert.AnError)
+	})
+}
+
+func TestStorageGSI1(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	t.Cleanup(ctrl.Finish)
+
+	dynamo := NewMockDynamoDB(ctrl)
+	ctx := context.TODO()
+
+	storage := dynamorm.NewStorage("TestTable", dynamo)
+
+	out := &dynamodb.ScanOutput{
+		Count: 1,
+		Items: []map[string]types.AttributeValue{
+			{"Email": &types.AttributeValueMemberS{Value: "usr1@go.dev"}},
+		},
+	}
+
+	t.Run("should scan table", func(t *testing.T) {
+		dynamo.EXPECT().
+			Scan(context.TODO(), &dynamodb.ScanInput{
+				TableName: aws.String("TestTable"),
+				IndexName: aws.String("GSI1"),
+			}).
+			Return(out, nil)
+
+		query, err := storage.ScanGSI1(ctx)
+		require.NoError(t, err)
+		require.Equal(t, int32(1), query.Count())
+	})
+
+	t.Run("should scan table with filter", func(t *testing.T) {
+		dynamo.EXPECT().
+			Scan(context.TODO(), &dynamodb.ScanInput{
+				TableName:        aws.String("TestTable"),
+				IndexName:        aws.String("GSI1"),
+				FilterExpression: aws.String("#Email = :Email"),
+				ExpressionAttributeValues: map[string]types.AttributeValue{
+					":Email": &types.AttributeValueMemberS{Value: "usr1@go.dev"},
+				},
+				ExpressionAttributeNames: map[string]string{
+					"#Email": "Email",
+				},
+			}).
+			Return(out, nil)
+
+		query, err := storage.ScanGSI1(ctx, dynamorm.EQ("Email", "usr1@go.dev"))
+		require.NoError(t, err)
+		require.Equal(t, int32(1), query.Count())
+	})
+
+	t.Run("should return error", func(t *testing.T) {
+		dynamo.EXPECT().
+			Scan(gomock.Any(), gomock.Any()).
+			Return(nil, assert.AnError)
+
+		_, err := storage.ScanGSI1(ctx)
+		require.ErrorIs(t, err, assert.AnError)
+	})
+}
+
+func TestStorageGSI2(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	t.Cleanup(ctrl.Finish)
+
+	dynamo := NewMockDynamoDB(ctrl)
+	ctx := context.TODO()
+
+	storage := dynamorm.NewStorage("TestTable", dynamo)
+
+	out := &dynamodb.ScanOutput{
+		Count: 1,
+		Items: []map[string]types.AttributeValue{
+			{"Email": &types.AttributeValueMemberS{Value: "usr1@go.dev"}},
+		},
+	}
+
+	t.Run("should scan table", func(t *testing.T) {
+		dynamo.EXPECT().
+			Scan(context.TODO(), &dynamodb.ScanInput{
+				TableName: aws.String("TestTable"),
+				IndexName: aws.String("GSI2"),
+			}).
+			Return(out, nil)
+
+		query, err := storage.ScanGSI2(ctx)
+		require.NoError(t, err)
+		require.Equal(t, int32(1), query.Count())
+	})
+
+	t.Run("should scan table with filter", func(t *testing.T) {
+		dynamo.EXPECT().
+			Scan(context.TODO(), &dynamodb.ScanInput{
+				TableName:        aws.String("TestTable"),
+				IndexName:        aws.String("GSI2"),
+				FilterExpression: aws.String("#Email = :Email"),
+				ExpressionAttributeValues: map[string]types.AttributeValue{
+					":Email": &types.AttributeValueMemberS{Value: "usr1@go.dev"},
+				},
+				ExpressionAttributeNames: map[string]string{
+					"#Email": "Email",
+				},
+			}).
+			Return(out, nil)
+
+		query, err := storage.ScanGSI2(ctx, dynamorm.EQ("Email", "usr1@go.dev"))
+		require.NoError(t, err)
+		require.Equal(t, int32(1), query.Count())
+	})
+
+	t.Run("should return error", func(t *testing.T) {
+		dynamo.EXPECT().
+			Scan(gomock.Any(), gomock.Any()).
+			Return(nil, assert.AnError)
+
+		_, err := storage.ScanGSI2(ctx)
+		require.ErrorIs(t, err, assert.AnError)
+	})
+}
+
 func TestStorageRemove(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	t.Cleanup(ctrl.Finish)

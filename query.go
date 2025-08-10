@@ -129,13 +129,22 @@ func (q *Query) NextPage(ctx context.Context) (bool, error) {
 
 	q.input.ExclusiveStartKey = q.output.LastEvaluatedKey
 
-	in := q.input.ToQueryInput()
-	out, err := q.client.Query(ctx, in)
-	if err != nil {
-		return false, err
+	if in := q.input.ToScanInput(); in != nil {
+		out, err := q.client.Scan(ctx, in)
+		if err != nil {
+			return false, err
+		}
+		q.output = NewOutputFromScanOutput(out)
+
+	} else {
+		in := q.input.ToQueryInput()
+		out, err := q.client.Query(ctx, in)
+		if err != nil {
+			return false, err
+		}
+		q.output = NewOutputFromQueryOutput(out)
 	}
 
-	q.output = NewOutputFromQueryOutput(out)
 	q.index = 0
 	return true, nil
 }

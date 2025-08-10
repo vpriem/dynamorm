@@ -180,3 +180,23 @@ func (mr *MockDynamoDBMockRecorder) Query(arg0, arg1 any, arg2 ...any) *gomock.C
 	varargs := append([]any{arg0, arg1}, arg2...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Query", reflect.TypeOf((*MockDynamoDB)(nil).Query), varargs...)
 }
+
+// Scan mocks base method.
+func (m *MockDynamoDB) Scan(arg0 context.Context, arg1 *dynamodb.ScanInput, arg2 ...func(*dynamodb.Options)) (*dynamodb.ScanOutput, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "Scan", varargs...)
+	ret0, _ := ret[0].(*dynamodb.ScanOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Scan indicates an expected call of Scan.
+func (mr *MockDynamoDBMockRecorder) Scan(arg0, arg1 any, arg2 ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Scan", reflect.TypeOf((*MockDynamoDB)(nil).Scan), varargs...)
+}

@@ -22,3 +22,13 @@ func NewOutputFromQueryOutput(q *dynamodb.QueryOutput) *Output {
 		LastEvaluatedKey: q.LastEvaluatedKey,
 	}
 }
+
+// NewOutputFromScanOutput converts an AWS SDK DynamoDB ScanOutput to the library's Output type.
+func NewOutputFromScanOutput(s *dynamodb.ScanOutput) *Output {
+	return &Output{
+		Count:            s.Count,
+		ScannedCount:     s.ScannedCount,
+		Items:            s.Items,
+		LastEvaluatedKey: s.LastEvaluatedKey,
+	}
+}
