@@ -13,6 +13,7 @@ import (
 func TestToQueryInput(t *testing.T) {
 	in := &dynamodb.QueryInput{
 		TableName:                 aws.String("table"),
+		ConsistentRead:            aws.Bool(true),
 		ExclusiveStartKey:         map[string]types.AttributeValue{"start": &types.AttributeValueMemberS{Value: "key"}},
 		ExpressionAttributeNames:  map[string]string{"attr": "attrName"},
 		ExpressionAttributeValues: map[string]types.AttributeValue{"attr": &types.AttributeValueMemberS{Value: "value"}},
@@ -20,10 +21,13 @@ func TestToQueryInput(t *testing.T) {
 		IndexName:                 aws.String("index"),
 		KeyConditionExpression:    aws.String("condition"),
 		Limit:                     aws.Int32(10),
+		ProjectionExpression:      aws.String("proj"),
+		ScanIndexForward:          aws.Bool(true),
 	}
 
 	input := &dynamorm.Input{
 		TableName:                 aws.String("table"),
+		ConsistentRead:            aws.Bool(true),
 		ExclusiveStartKey:         map[string]types.AttributeValue{"start": &types.AttributeValueMemberS{Value: "key"}},
 		ExpressionAttributeNames:  map[string]string{"attr": "attrName"},
 		ExpressionAttributeValues: map[string]types.AttributeValue{"attr": &types.AttributeValueMemberS{Value: "value"}},
@@ -31,6 +35,8 @@ func TestToQueryInput(t *testing.T) {
 		IndexName:                 aws.String("index"),
 		KeyConditionExpression:    aws.String("condition"),
 		Limit:                     aws.Int32(10),
+		ProjectionExpression:      aws.String("proj"),
+		ScanIndexForward:          aws.Bool(true),
 	}
 
 	require.Equal(t, in, input.ToQueryInput())
@@ -40,16 +46,19 @@ func TestToQueryInput(t *testing.T) {
 func TestToScanInput(t *testing.T) {
 	in := &dynamodb.ScanInput{
 		TableName:                 aws.String("table"),
+		ConsistentRead:            aws.Bool(true),
 		ExclusiveStartKey:         map[string]types.AttributeValue{"start": &types.AttributeValueMemberS{Value: "key"}},
 		ExpressionAttributeNames:  map[string]string{"attr": "attrName"},
 		ExpressionAttributeValues: map[string]types.AttributeValue{"attr": &types.AttributeValueMemberS{Value: "value"}},
 		FilterExpression:          aws.String("filter"),
 		IndexName:                 aws.String("index"),
 		Limit:                     aws.Int32(10),
+		ProjectionExpression:      aws.String("proj"),
 	}
 
 	input := &dynamorm.Input{
 		TableName:                 aws.String("table"),
+		ConsistentRead:            aws.Bool(true),
 		ExclusiveStartKey:         map[string]types.AttributeValue{"start": &types.AttributeValueMemberS{Value: "key"}},
 		ExpressionAttributeNames:  map[string]string{"attr": "attrName"},
 		ExpressionAttributeValues: map[string]types.AttributeValue{"attr": &types.AttributeValueMemberS{Value: "value"}},
@@ -58,6 +67,7 @@ func TestToScanInput(t *testing.T) {
 		KeyConditionExpression:    aws.String("condition"),
 		Limit:                     aws.Int32(10),
 		IsScan:                    true,
+		ProjectionExpression:      aws.String("proj"),
 	}
 
 	require.Equal(t, in, input.ToScanInput())

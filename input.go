@@ -13,6 +13,7 @@ import (
 // It provides a simplified interface for the AWS SDK's QueryInput and ScanInput.
 type Input struct {
 	TableName                 *string
+	ConsistentRead            *bool
 	ExclusiveStartKey         map[string]types.AttributeValue
 	ExpressionAttributeNames  map[string]string
 	ExpressionAttributeValues map[string]types.AttributeValue
@@ -21,6 +22,8 @@ type Input struct {
 	KeyConditionExpression    *string
 	Limit                     *int32
 	IsScan                    bool
+	ProjectionExpression      *string
+	ScanIndexForward          *bool
 }
 
 func (i *Input) refField(name string) string {
@@ -59,6 +62,7 @@ func (i *Input) ToQueryInput() *dynamodb.QueryInput {
 
 	return &dynamodb.QueryInput{
 		TableName:                 i.TableName,
+		ConsistentRead:            i.ConsistentRead,
 		ExclusiveStartKey:         i.ExclusiveStartKey,
 		ExpressionAttributeNames:  i.ExpressionAttributeNames,
 		ExpressionAttributeValues: i.ExpressionAttributeValues,
@@ -66,6 +70,8 @@ func (i *Input) ToQueryInput() *dynamodb.QueryInput {
 		IndexName:                 i.IndexName,
 		KeyConditionExpression:    i.KeyConditionExpression,
 		Limit:                     i.Limit,
+		ProjectionExpression:      i.ProjectionExpression,
+		ScanIndexForward:          i.ScanIndexForward,
 	}
 }
 
@@ -77,12 +83,14 @@ func (i *Input) ToScanInput() *dynamodb.ScanInput {
 
 	return &dynamodb.ScanInput{
 		TableName:                 i.TableName,
+		ConsistentRead:            i.ConsistentRead,
 		ExclusiveStartKey:         i.ExclusiveStartKey,
 		ExpressionAttributeNames:  i.ExpressionAttributeNames,
 		ExpressionAttributeValues: i.ExpressionAttributeValues,
 		FilterExpression:          i.FilterExpression,
 		IndexName:                 i.IndexName,
 		Limit:                     i.Limit,
+		ProjectionExpression:      i.ProjectionExpression,
 	}
 }
 

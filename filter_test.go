@@ -3,7 +3,6 @@ package dynamorm
 import (
 	"testing"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/stretchr/testify/require"
 )
@@ -143,7 +142,7 @@ func TestFilter(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			input := &Input{}
 			tt.filter(input)
-			require.Equal(t, aws.String(tt.expectedExpr), input.FilterExpression, *input.FilterExpression)
+			require.Equal(t, tt.expectedExpr, *input.FilterExpression)
 			require.Equal(t, tt.expectedValues, input.ExpressionAttributeValues)
 			require.Equal(t, tt.expectedNames, input.ExpressionAttributeNames)
 		})

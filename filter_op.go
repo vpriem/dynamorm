@@ -14,6 +14,9 @@ var OR = createOperator("OR")
 // AND creates a Filter that combines multiple filters with AND logic.
 var AND = createOperator("AND")
 
+// NOT creates a Filter that combines multiple filters with NOT logic.
+var NOT = createOperator("NOT")
+
 func createOperator(op string) func(filters ...Filter) Filter {
 	return func(filters ...Filter) Filter {
 		return func(input *Input) {

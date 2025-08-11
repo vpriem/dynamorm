@@ -3,7 +3,6 @@ package dynamorm
 import (
 	"testing"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/stretchr/testify/require"
 )
@@ -103,13 +102,26 @@ func TestORFilter(t *testing.T) {
 				"#Name": "Name",
 			},
 		},
+		{
+			name:         "NOT with two filters",
+			filter:       NOT(EQ("Name", "John"), LT("Age", 40)),
+			expectedExpr: "(#Name = :Name NOT #Age < :Age)",
+			expectedValues: map[string]types.AttributeValue{
+				":Name": &types.AttributeValueMemberS{Value: "John"},
+				":Age":  &types.AttributeValueMemberN{Value: "40"},
+			},
+			expectedNames: map[string]string{
+				"#Name": "Name",
+				"#Age":  "Age",
+			},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			input := &Input{}
 			tt.filter(input)
-			require.Equal(t, aws.String(tt.expectedExpr), input.FilterExpression, *input.FilterExpression)
+			require.Equal(t, tt.expectedExpr, *input.FilterExpression)
 			require.Equal(t, tt.expectedValues, input.ExpressionAttributeValues)
 			require.Equal(t, tt.expectedNames, input.ExpressionAttributeNames)
 		})
