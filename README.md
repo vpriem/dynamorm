@@ -209,6 +209,13 @@ for {
 }
 ```
 
+## Running tests
+
+- Unit tests: `make test`
+- Integration tests: `make integration` (requires Docker)
+- All tests: `make test-all`
+- Coverage report: `make coverage`
+
 ## License
 
 DynamORM is released under the [MIT License](LICENSE).

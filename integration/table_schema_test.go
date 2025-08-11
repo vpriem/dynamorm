@@ -1,4 +1,4 @@
-package dynamorm_test
+package integration_test
 
 import (
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -6,7 +6,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
-var tableSchema = &dynamodb.CreateTableInput{
+var TableSchema = &dynamodb.CreateTableInput{
 	AttributeDefinitions: []types.AttributeDefinition{
 		{AttributeName: aws.String("PK"), AttributeType: types.ScalarAttributeTypeS},
 		{AttributeName: aws.String("SK"), AttributeType: types.ScalarAttributeTypeS},

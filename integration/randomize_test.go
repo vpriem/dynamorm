@@ -1,4 +1,4 @@
-package dynamorm_test
+package integration_test
 
 import (
 	"math/rand"

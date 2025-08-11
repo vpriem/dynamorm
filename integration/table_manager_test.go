@@ -1,4 +1,4 @@
-package dynamorm
+package integration_test
 
 import (
 	"context"
@@ -8,16 +8,17 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/pkg/errors"
+	"github.com/vpriem/dynamorm"
 )
 
 type TableManager struct {
-	client  DynamoDB
+	client  dynamorm.DynamoDB
 	schema  *dynamodb.CreateTableInput
 	waiter  *dynamodb.TableExistsWaiter
 	timeout time.Duration
 }
 
-func NewTableManager(client DynamoDB, schema *dynamodb.CreateTableInput) *TableManager {
+func NewTableManager(client dynamorm.DynamoDB, schema *dynamodb.CreateTableInput) *TableManager {
 	return &TableManager{client, schema, dynamodb.NewTableExistsWaiter(client), 5 * time.Minute}
 }
 

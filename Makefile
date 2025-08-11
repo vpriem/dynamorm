@@ -17,12 +17,20 @@ install-go-test-coverage:
 .PHONY: test
 test:
 	@echo "Running all tests..."
-	go test ./...
+	go test ./... -short
+
+.PHONY: integration
+integration:
+	@echo "Running integration tests..."
+	docker-compose -f ./integration/docker-compose.yml up -d
+	go test ./integration/... -count=1
+
+test-all: test integration
 
 .PHONY: coverage
 coverage: install-go-test-coverage
 	@echo "Running all tests with coverage..."
-	go test ./... -coverprofile=./coverage.out -covermode=atomic -coverpkg=./...
+	go test ./... -short -coverprofile=./coverage.out -covermode=atomic -coverpkg=./...
 	${GOBIN}/go-test-coverage --config=./.testcoverage.yml
 
 .PHONY: gen

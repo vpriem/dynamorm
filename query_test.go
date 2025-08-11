@@ -51,10 +51,10 @@ func TestQueryFirst(t *testing.T) {
 
 		query := dynamorm.NewQuery(dynamo, nil, output, nil)
 
-		cust := &Customer{}
-		err := query.First(cust)
+		e := &TestEntity{}
+		err := query.First(e)
 		require.NoError(t, err)
-		require.Equal(t, "usr1@go.dev", cust.Email)
+		require.Equal(t, "usr1@go.dev", e.Email)
 	})
 
 	t.Run("should return ErrIndexOutOfRange when no items", func(t *testing.T) {
@@ -105,10 +105,10 @@ func TestQueryLast(t *testing.T) {
 
 		query := dynamorm.NewQuery(dynamo, nil, output, nil)
 
-		cust := &Customer{}
-		err := query.Last(cust)
+		e := &TestEntity{}
+		err := query.Last(e)
 		require.NoError(t, err)
-		require.Equal(t, "usr3@go.dev", cust.Email)
+		require.Equal(t, "usr3@go.dev", e.Email)
 	})
 
 	t.Run("should return ErrIndexOutOfRange when no items", func(t *testing.T) {
@@ -158,34 +158,34 @@ func TestQueryIterator(t *testing.T) {
 	t.Run("should iterate through all items", func(t *testing.T) {
 		query := dynamorm.NewQuery(dynamo, nil, output, dec)
 
-		dec.EXPECT().Decode(out.Items[0], &Customer{}).Return(nil)
-		dec.EXPECT().Decode(out.Items[1], &Customer{}).Return(nil)
-		dec.EXPECT().Decode(out.Items[2], &Customer{}).Return(nil)
+		dec.EXPECT().Decode(out.Items[0], &TestEntity{}).Return(nil)
+		dec.EXPECT().Decode(out.Items[1], &TestEntity{}).Return(nil)
+		dec.EXPECT().Decode(out.Items[2], &TestEntity{}).Return(nil)
 
-		var customers []*Customer
+		var entities []*TestEntity
 
 		for query.Next() {
-			cust := &Customer{}
-			err := query.Decode(cust)
+			e := &TestEntity{}
+			err := query.Decode(e)
 			require.NoError(t, err)
-			customers = append(customers, cust)
+			entities = append(entities, e)
 		}
 
 		require.False(t, query.Next())
-		require.Equal(t, 3, len(customers))
+		require.Equal(t, 3, len(entities))
 	})
 
 	t.Run("should return ErrIndexOutOfRange", func(t *testing.T) {
 		query := dynamorm.NewQuery(dynamo, nil, output, dec)
 
-		err := query.Decode(&Customer{})
+		err := query.Decode(nil)
 		require.ErrorIs(t, err, dynamorm.ErrIndexOutOfRange)
 
 		for query.Next() {
 		}
 
 		require.False(t, query.Next())
-		err = query.Decode(&Customer{})
+		err = query.Decode(nil)
 		require.ErrorIs(t, err, dynamorm.ErrIndexOutOfRange)
 	})
 
@@ -205,7 +205,7 @@ func TestQueryIterator(t *testing.T) {
 		dec.EXPECT().Decode(gomock.Any(), gomock.Any()).Return(assert.AnError)
 
 		require.True(t, query.Next())
-		err := query.Decode(&Customer{})
+		err := query.Decode(nil)
 		require.ErrorIs(t, err, assert.AnError)
 	})
 }
@@ -267,10 +267,10 @@ func TestQueryPagination(t *testing.T) {
 		var emails []string
 		for {
 			for query.Next() {
-				cust := &Customer{}
-				err := query.Decode(cust)
+				e := &TestEntity{}
+				err := query.Decode(e)
 				require.NoError(t, err)
-				emails = append(emails, cust.Email)
+				emails = append(emails, e.Email)
 			}
 
 			hasMore, err := query.NextPage(ctx)
@@ -304,10 +304,10 @@ func TestQueryPagination(t *testing.T) {
 		var emails []string
 		for {
 			for query.Next() {
-				cust := &Customer{}
-				err := query.Decode(cust)
+				e := &TestEntity{}
+				err := query.Decode(e)
 				require.NoError(t, err)
-				emails = append(emails, cust.Email)
+				emails = append(emails, e.Email)
 			}
 
 			hasMore, err := query.NextPage(ctx)
@@ -381,7 +381,7 @@ func TestScanPagination(t *testing.T) {
 		var emails []string
 		for {
 			for query.Next() {
-				e := &Customer{}
+				e := &TestEntity{}
 				err := query.Decode(e)
 				require.NoError(t, err)
 				emails = append(emails, e.Email)
@@ -415,10 +415,10 @@ func TestScanPagination(t *testing.T) {
 		var emails []string
 		for {
 			for query.Next() {
-				cust := &Customer{}
-				err := query.Decode(cust)
+				e := &TestEntity{}
+				err := query.Decode(e)
 				require.NoError(t, err)
-				emails = append(emails, cust.Email)
+				emails = append(emails, e.Email)
 			}
 
 			hasMore, err := query.NextPage(ctx)
