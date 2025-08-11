@@ -21,9 +21,12 @@ type QueryInterface interface {
 	// Next advances the iterator to the next item.
 	// Returns true if there is a next item available, false otherwise.
 	Next() bool
-	// NextPage fetch the next page of results using the LastEvaluatedKey.
-	// Returns true if there is more results to be fetched, false otherwise.
-	NextPage(context.Context) (bool, error)
+	// NextPage fetches the next page of results using the LastEvaluatedKey.
+	// Returns true if there are more results to be fetched, false otherwise.
+	// Any error encountered can be retrieved via Error().
+	NextPage(context.Context) bool
+	// Error returns the last error encountered during pagination.
+	Error() error
 	// Reset resets the iterator to the beginning
 	Reset()
 	// Decode decodes the current item into the provided interface
@@ -39,6 +42,8 @@ type Query struct {
 	output  *Output
 	decoder DecoderInterface
 	index   int
+	paged   bool
+	err     error
 }
 
 // NewQuery creates a new Query instance from the query input and output.
@@ -99,9 +104,15 @@ func (q *Query) Next() bool {
 	return q.index <= len(q.output.Items)
 }
 
-func (q *Query) NextPage(ctx context.Context) (bool, error) {
+func (q *Query) NextPage(ctx context.Context) bool {
+	// On first call, serve the current page without fetching
+	if !q.paged {
+		q.paged = true
+		return true
+	}
+
 	if q.output.LastEvaluatedKey == nil {
-		return false, nil
+		return false
 	}
 
 	q.input.ExclusiveStartKey = q.output.LastEvaluatedKey
@@ -109,7 +120,8 @@ func (q *Query) NextPage(ctx context.Context) (bool, error) {
 	if in := q.input.ToScanInput(); in != nil {
 		out, err := q.client.Scan(ctx, in)
 		if err != nil {
-			return false, err
+			q.err = err
+			return false
 		}
 		q.output = NewOutputFromScanOutput(out)
 
@@ -117,17 +129,19 @@ func (q *Query) NextPage(ctx context.Context) (bool, error) {
 		in := q.input.ToQueryInput()
 		out, err := q.client.Query(ctx, in)
 		if err != nil {
-			return false, err
+			q.err = err
+			return false
 		}
 		q.output = NewOutputFromQueryOutput(out)
 	}
 
-	q.index = 0
-	return true, nil
+	q.Reset()
+	return true
 }
 
 func (q *Query) Reset() {
 	q.index = 0
+	q.err = nil
 }
 
 func (q *Query) Decode(e Entity) error {
@@ -136,4 +150,8 @@ func (q *Query) Decode(e Entity) error {
 	}
 
 	return q.decoder.Decode(q.output.Items[q.index-1], e)
+}
+
+func (q *Query) Error() error {
+	return q.err
 }

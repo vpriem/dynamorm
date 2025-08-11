@@ -51,21 +51,16 @@ func TestCustomer(t *testing.T) {
 		require.NoError(t, err)
 
 		var found *Customer
-		for {
+		for q.NextPage(context.TODO()) {
 			for q.Next() {
 				cust := &Customer{}
 				err = q.Decode(cust)
 				require.NoError(t, err)
 				found = cust
 			}
-
-			hasMore, err := q.NextPage(context.TODO())
-			require.NoError(t, err)
-			if !hasMore {
-				break
-			}
 		}
 
+		require.NoError(t, q.Error())
 		require.NotNil(t, found)
 		require.Equal(t, cust1.Id, found.Id)
 	})

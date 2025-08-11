@@ -186,26 +186,19 @@ for query.Next() {
 }
 ```
 
-To retrieve additional results, call `NextPage(ctx)`. This method returns a boolean indicating whether more pages exist and an error if the query fails.
+To retrieve additional results, call `NextPage(ctx)`. Use it as the outer loop and check `query.Error()` after the loop for any pagination error.
 
 ```go
 // Iterate through all items across all pages
-for {
+for query.NextPage(ctx) {
     // Process current page
     for query.Next() {
         // Process item
     }
+}
 
-    // Fetch next page
-    hasMore, err := query.NextPage(ctx)
-    if err != nil {
-        // Handle query error
-        break
-    }
-    if !hasMore {
-        // No more pages to fetch
-        break
-    }
+if err := query.Error(); err != nil {
+    // Handle pagination error
 }
 ```
 

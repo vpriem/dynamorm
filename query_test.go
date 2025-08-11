@@ -265,21 +265,16 @@ func TestQueryPagination(t *testing.T) {
 			Return(out3, nil)
 
 		var emails []string
-		for {
+		for query.NextPage(ctx) {
 			for query.Next() {
 				e := &TestEntity{}
 				err := query.Decode(e)
 				require.NoError(t, err)
 				emails = append(emails, e.Email)
 			}
-
-			hasMore, err := query.NextPage(ctx)
-			require.NoError(t, err)
-			if !hasMore {
-				break
-			}
 		}
 
+		require.NoError(t, query.Error())
 		require.Equal(t, int32(1), query.Count())
 		require.Equal(t, []string{
 			"usr0@go.dev",
@@ -302,22 +297,16 @@ func TestQueryPagination(t *testing.T) {
 			Return(nil, assert.AnError)
 
 		var emails []string
-		for {
+		for query.NextPage(ctx) {
 			for query.Next() {
 				e := &TestEntity{}
 				err := query.Decode(e)
 				require.NoError(t, err)
 				emails = append(emails, e.Email)
 			}
-
-			hasMore, err := query.NextPage(ctx)
-			require.ErrorIs(t, err, assert.AnError)
-			require.False(t, hasMore)
-			if !hasMore {
-				break
-			}
 		}
 
+		require.ErrorIs(t, query.Error(), assert.AnError)
 		require.Equal(t, []string{
 			"usr0@go.dev",
 			"usr1@go.dev",
@@ -379,21 +368,16 @@ func TestScanPagination(t *testing.T) {
 			Return(out3, nil)
 
 		var emails []string
-		for {
+		for query.NextPage(ctx) {
 			for query.Next() {
 				e := &TestEntity{}
 				err := query.Decode(e)
 				require.NoError(t, err)
 				emails = append(emails, e.Email)
 			}
-
-			hasMore, err := query.NextPage(ctx)
-			require.NoError(t, err)
-			if !hasMore {
-				break
-			}
 		}
 
+		require.NoError(t, query.Error())
 		require.Equal(t, int32(1), query.Count())
 		require.Equal(t, []string{
 			"usr0@go.dev",
@@ -413,22 +397,16 @@ func TestScanPagination(t *testing.T) {
 			Return(nil, assert.AnError)
 
 		var emails []string
-		for {
+		for query.NextPage(ctx) {
 			for query.Next() {
 				e := &TestEntity{}
 				err := query.Decode(e)
 				require.NoError(t, err)
 				emails = append(emails, e.Email)
 			}
-
-			hasMore, err := query.NextPage(ctx)
-			require.ErrorIs(t, err, assert.AnError)
-			require.False(t, hasMore)
-			if !hasMore {
-				break
-			}
 		}
 
+		require.ErrorIs(t, query.Error(), assert.AnError)
 		require.Equal(t, []string{
 			"usr0@go.dev",
 		}, emails)
