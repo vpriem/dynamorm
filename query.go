@@ -3,8 +3,6 @@ package dynamorm
 import (
 	"context"
 	"fmt"
-
-	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
 // QueryInterface provides an interface to handle DynamoDB query results.
@@ -14,9 +12,12 @@ type QueryInterface interface {
 	Count() int32
 	// ScannedCount returns the number of items evaluated of the current the query result
 	ScannedCount() int32
-	// First retrieves the first matching entity from the query results
-	// Optional FindCondition parameters can be provided to filter the results
-	First(Entity, ...FindCondition) error
+	// First decodes the first item in the current result set into the provided entity.
+	// Returns ErrIndexOutOfRange if there are no items.
+	First(Entity) error
+	// Last decodes the last item in the current result set into the provided entity.
+	// Returns ErrIndexOutOfRange if there are no items.
+	Last(Entity) error
 	// Next advances the iterator to the next item.
 	// Returns true if there is a next item available, false otherwise.
 	Next() bool
@@ -68,53 +69,29 @@ func (q *Query) ScannedCount() int32 {
 	return q.output.ScannedCount
 }
 
-func (q *Query) First(e Entity, conditions ...FindCondition) error {
-	var foundItem map[string]types.AttributeValue
-
-	if len(conditions) == 0 {
-		if len(q.output.Items) > 0 {
-			foundItem = q.output.Items[0]
-		}
-	} else {
-		for _, item := range q.output.Items {
-			for _, condition := range conditions {
-				if condition(item) {
-					foundItem = item
-					break
-				}
-			}
-			if foundItem != nil {
-				break
-			}
-		}
+func (q *Query) First(e Entity) error {
+	if len(q.output.Items) == 0 {
+		return ErrIndexOutOfRange
 	}
 
-	if foundItem != nil {
-		if err := q.decoder.Decode(foundItem, e); err != nil {
-			return fmt.Errorf("failed to decode entity: %w", err)
-		}
-		return nil
+	item := q.output.Items[0]
+	if err := q.decoder.Decode(item, e); err != nil {
+		return fmt.Errorf("failed to decode entity: %w", err)
 	}
-
-	return ErrEntityNotFound
+	return nil
 }
 
-type FindCondition func(item map[string]types.AttributeValue) bool
-
-func FieldValue(field string, value interface{}) FindCondition {
-	return func(item map[string]types.AttributeValue) bool {
-		if av, ok := item[field]; ok {
-			switch v := av.(type) {
-			case *types.AttributeValueMemberS:
-				return v.Value == value
-			case *types.AttributeValueMemberN:
-				return v.Value == fmt.Sprintf("%v", value)
-			case *types.AttributeValueMemberBOOL:
-				return v.Value == value
-			}
-		}
-		return false
+func (q *Query) Last(e Entity) error {
+	length := len(q.output.Items)
+	if length == 0 {
+		return ErrIndexOutOfRange
 	}
+
+	item := q.output.Items[length-1]
+	if err := q.decoder.Decode(item, e); err != nil {
+		return fmt.Errorf("failed to decode entity: %w", err)
+	}
+	return nil
 }
 
 func (q *Query) Next() bool {

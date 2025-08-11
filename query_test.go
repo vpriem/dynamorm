@@ -38,64 +38,103 @@ func TestQueryFirst(t *testing.T) {
 	t.Cleanup(ctrl.Finish)
 
 	dynamo := NewMockDynamoDB(ctrl)
-	dec := NewMockDecoderInterface(ctrl)
-
-	out := &dynamodb.QueryOutput{
-		Items: []map[string]types.AttributeValue{
-			{"Attr": &types.AttributeValueMemberS{Value: "str"}},
-			{"Attr": &types.AttributeValueMemberBOOL{Value: true}},
-			{"Attr": &types.AttributeValueMemberN{Value: "12.34"}},
-		},
-	}
-	output := dynamorm.NewOutputFromQueryOutput(out)
-
-	query := dynamorm.NewQuery(dynamo, nil, output, dec)
-
-	cust := &Customer{}
 
 	t.Run("should decode first item", func(t *testing.T) {
-		dec.EXPECT().Decode(out.Items[0], cust).Return(nil)
+		out := &dynamodb.QueryOutput{
+			Items: []map[string]types.AttributeValue{
+				{"Email": &types.AttributeValueMemberS{Value: "usr1@go.dev"}},
+				{"Email": &types.AttributeValueMemberS{Value: "usr2@go.dev"}},
+				{"Email": &types.AttributeValueMemberS{Value: "usr3@go.dev"}},
+			},
+		}
+		output := dynamorm.NewOutputFromQueryOutput(out)
 
+		query := dynamorm.NewQuery(dynamo, nil, output, nil)
+
+		cust := &Customer{}
 		err := query.First(cust)
 		require.NoError(t, err)
+		require.Equal(t, "usr1@go.dev", cust.Email)
 	})
 
-	t.Run("should decode first string item", func(t *testing.T) {
-		dec.EXPECT().Decode(out.Items[0], cust).Return(nil)
+	t.Run("should return ErrIndexOutOfRange when no items", func(t *testing.T) {
+		out := &dynamodb.QueryOutput{
+			Items: []map[string]types.AttributeValue{},
+		}
+		output := dynamorm.NewOutputFromQueryOutput(out)
 
-		err := query.First(cust, dynamorm.FieldValue("Attr", ""))
-		require.ErrorIs(t, err, dynamorm.ErrEntityNotFound)
-		err = query.First(cust, dynamorm.FieldValue("Attr", "str"))
-		require.NoError(t, err)
-	})
+		query := dynamorm.NewQuery(dynamo, nil, output, nil)
 
-	t.Run("should decode first bool item", func(t *testing.T) {
-		dec.EXPECT().Decode(out.Items[1], cust).Return(nil)
-
-		err := query.First(cust, dynamorm.FieldValue("Attr", false))
-		require.ErrorIs(t, err, dynamorm.ErrEntityNotFound)
-		err = query.First(cust, dynamorm.FieldValue("Attr", true))
-		require.NoError(t, err)
-	})
-
-	t.Run("should decode first number item", func(t *testing.T) {
-		dec.EXPECT().Decode(out.Items[2], cust).Return(nil)
-
-		err := query.First(cust, dynamorm.FieldValue("Attr", 1.2))
-		require.ErrorIs(t, err, dynamorm.ErrEntityNotFound)
-		err = query.First(cust, dynamorm.FieldValue("Attr", 12.34))
-		require.NoError(t, err)
-	})
-
-	t.Run("should return ErrEntityNotFound", func(t *testing.T) {
-		err := query.First(cust, dynamorm.FieldValue("Foo", "bar"))
-		require.ErrorIs(t, err, dynamorm.ErrEntityNotFound)
+		err := query.First(nil)
+		require.ErrorIs(t, err, dynamorm.ErrIndexOutOfRange)
 	})
 
 	t.Run("should return decode error", func(t *testing.T) {
+		dec := NewMockDecoderInterface(ctrl)
 		dec.EXPECT().Decode(gomock.Any(), gomock.Any()).Return(assert.AnError)
 
-		err := query.First(cust)
+		out := &dynamodb.QueryOutput{
+			Items: []map[string]types.AttributeValue{
+				{"Email": &types.AttributeValueMemberS{Value: "usr1@go.dev"}},
+			},
+		}
+		output := dynamorm.NewOutputFromQueryOutput(out)
+
+		query := dynamorm.NewQuery(dynamo, nil, output, dec)
+
+		err := query.First(nil)
+		require.ErrorIs(t, err, assert.AnError)
+	})
+}
+
+func TestQueryLast(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	t.Cleanup(ctrl.Finish)
+
+	dynamo := NewMockDynamoDB(ctrl)
+
+	t.Run("should decode last item", func(t *testing.T) {
+		out := &dynamodb.QueryOutput{
+			Items: []map[string]types.AttributeValue{
+				{"Email": &types.AttributeValueMemberS{Value: "usr1@go.dev"}},
+				{"Email": &types.AttributeValueMemberS{Value: "usr2@go.dev"}},
+				{"Email": &types.AttributeValueMemberS{Value: "usr3@go.dev"}},
+			},
+		}
+		output := dynamorm.NewOutputFromQueryOutput(out)
+
+		query := dynamorm.NewQuery(dynamo, nil, output, nil)
+
+		cust := &Customer{}
+		err := query.Last(cust)
+		require.NoError(t, err)
+		require.Equal(t, "usr3@go.dev", cust.Email)
+	})
+
+	t.Run("should return ErrIndexOutOfRange when no items", func(t *testing.T) {
+		out := &dynamodb.QueryOutput{
+			Items: []map[string]types.AttributeValue{},
+		}
+		output := dynamorm.NewOutputFromQueryOutput(out)
+
+		query := dynamorm.NewQuery(dynamo, nil, output, nil)
+		err := query.Last(nil)
+		require.ErrorIs(t, err, dynamorm.ErrIndexOutOfRange)
+	})
+
+	t.Run("should return decode error", func(t *testing.T) {
+		dec := NewMockDecoderInterface(ctrl)
+		dec.EXPECT().Decode(gomock.Any(), gomock.Any()).Return(assert.AnError)
+
+		out := &dynamodb.QueryOutput{
+			Items: []map[string]types.AttributeValue{
+				{"Email": &types.AttributeValueMemberS{Value: "usr1@go.dev"}},
+			},
+		}
+		output := dynamorm.NewOutputFromQueryOutput(out)
+
+		query := dynamorm.NewQuery(dynamo, nil, output, dec)
+		err := query.Last(nil)
 		require.ErrorIs(t, err, assert.AnError)
 	})
 }

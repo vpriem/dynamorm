@@ -135,12 +135,21 @@ fmt.Printf("Found user: %v\n", user)
 // Find user using GSI1PK=USER#EMAIL GSI1SK=john@doe.com
 query, err := storage.QueryGSI1(ctx, "USER#EMAIL", dynamorm.SkEQ("john@doe.com"))
 
-// Get first result
+// Get first result of the current page
 user := &User{}
 err = query.First(user)
 if err != nil {
-    if errors.Is(err, dynamorm.ErrEntityNotFound) {
-        // Handle not found case
+    if errors.Is(err, dynamorm.ErrIndexOutOfRange) {
+        // No items in the current page
+    }
+}
+
+// Get last result of the current page
+user := &User{}
+err = query.Last(user)
+if err != nil {
+    if errors.Is(err, dynamorm.ErrIndexOutOfRange) {
+    // No items in the current page
     }
 }
 
@@ -157,6 +166,8 @@ query, err := storage.QueryGSI1(ctx, "USER#EMAIL",
         dynamorm.EQ("Name", "Jane Doe"),
     ))
 ```
+
+Note: `First()` and `Last()` operate on the current page of results. Use NextPage(ctx) to fetch subsequent pages.
 
 #### Query Iterator
 
