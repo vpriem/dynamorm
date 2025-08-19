@@ -73,7 +73,7 @@ type StorageInterface interface {
 	// Remove deletes an entity from DynamoDB by its PK/SK.
 	// It calls entity.PkSk() to determine how to delete the entity.
 	// Returns an error if the operation fails.
-	Remove(context.Context, Entity) error
+	Remove(context.Context, Entity, ...RemoveOption) error
 }
 
 // Storage implements the StorageInterface for DynamoDB operations.
@@ -397,7 +397,7 @@ func (s *Storage) Update(ctx context.Context, e Entity, update expression.Update
 	return nil
 }
 
-func (s *Storage) Remove(ctx context.Context, e Entity) error {
+func (s *Storage) Remove(ctx context.Context, e Entity, opts ...RemoveOption) error {
 	pk, sk := e.PkSk()
 	if pk == "" {
 		return errors.New("entity pk is empty")
@@ -412,6 +412,27 @@ func (s *Storage) Remove(ctx context.Context, e Entity) error {
 			"PK": &types.AttributeValueMemberS{Value: pk},
 			"SK": &types.AttributeValueMemberS{Value: sk},
 		},
+	}
+
+	builder := s.newBuilder()
+	var nextBuilder BuilderInterface
+
+	for _, apply := range opts {
+		if apply != nil {
+			if b := apply(input, builder); b != nil {
+				nextBuilder = b
+			}
+		}
+	}
+
+	if nextBuilder != nil {
+		expr, err := nextBuilder.Build()
+		if err != nil {
+			return err
+		}
+		input.ConditionExpression = expr.Condition()
+		input.ExpressionAttributeNames = expr.Names()
+		input.ExpressionAttributeValues = expr.Values()
 	}
 
 	_, err := s.client.DeleteItem(ctx, input)

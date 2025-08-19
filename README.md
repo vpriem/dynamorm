@@ -229,6 +229,22 @@ if err != nil {
 This updates specific attributes without overwriting the entire item.
 In this example, `dynamorm.ALL_NEW` returns the entire updated item; it will be decoded into the provided entity.
 
+### Removing an Entity
+
+```go
+user := &User{ID: uuid.MustParse("9be35b9b-e526-404f-8252-e14ce1cb9624")}
+
+// Optional: apply a condition to the delete (e.g., only delete if Name exists)
+cond := expression.AttributeExists(expression.Name("Name"))
+
+err := storage.Remove(ctx, user,
+    dynamorm.RemoveCondition(cond),
+)
+if err != nil {
+    // Handle error
+}
+```
+
 ## Running Tests
 
 - Unit tests: `make test`

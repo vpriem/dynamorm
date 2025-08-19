@@ -662,7 +662,14 @@ func TestStorageRemove(t *testing.T) {
 	t.Cleanup(ctrl.Finish)
 
 	dynamo := NewMockDynamoDB(ctrl)
-	storage := dynamorm.NewStorage("TestTable", dynamo)
+	expr := NewMockExpression(ctrl)
+	builder := NewMockBuilderInterface(ctrl)
+	newBuilder := func() dynamorm.BuilderInterface { return builder }
+	storage := dynamorm.NewStorage("TestTable", dynamo, dynamorm.WithBuilder(newBuilder))
+
+	cond := expression.AttributeExists(expression.Name("Attr"))
+	names := map[string]string{}
+	values := map[string]types.AttributeValue{}
 
 	t.Run("should remove entity", func(t *testing.T) {
 		e := NewMockEntity(ctrl)
@@ -709,6 +716,45 @@ func TestStorageRemove(t *testing.T) {
 		err := storage.Remove(context.TODO(), e)
 		require.ErrorIs(t, err, assert.AnError)
 	})
+
+	t.Run("should remove entity with condition", func(t *testing.T) {
+		e := NewMockEntity(ctrl)
+		e.EXPECT().PkSk().Return("PK#1", "SK#1")
+
+		builder.EXPECT().WithCondition(cond).Return(builder)
+		builder.EXPECT().Build().Return(expr, nil)
+
+		expr.EXPECT().Names().Return(names)
+		expr.EXPECT().Values().Return(values)
+		expr.EXPECT().Condition().Return(aws.String("condition"))
+
+		dynamo.EXPECT().
+			DeleteItem(context.TODO(), &dynamodb.DeleteItemInput{
+				TableName: aws.String("TestTable"),
+				Key: map[string]types.AttributeValue{
+					"PK": &types.AttributeValueMemberS{Value: "PK#1"},
+					"SK": &types.AttributeValueMemberS{Value: "SK#1"},
+				},
+				ConditionExpression:       aws.String("condition"),
+				ExpressionAttributeNames:  names,
+				ExpressionAttributeValues: values,
+			}).
+			Return(&dynamodb.DeleteItemOutput{}, nil)
+
+		err := storage.Remove(context.TODO(), e, dynamorm.RemoveCondition(cond))
+		require.NoError(t, err)
+	})
+
+	t.Run("should return builder error", func(t *testing.T) {
+		e := NewMockEntity(ctrl)
+		e.EXPECT().PkSk().Return("PK#1", "SK#1")
+
+		builder.EXPECT().WithCondition(gomock.Any()).Return(builder)
+		builder.EXPECT().Build().Return(nil, assert.AnError)
+
+		err := storage.Remove(context.TODO(), e, dynamorm.RemoveCondition(cond))
+		require.ErrorIs(t, err, assert.AnError)
+	})
 }
 
 func TestStorageUpdate(t *testing.T) {
@@ -719,9 +765,7 @@ func TestStorageUpdate(t *testing.T) {
 	dec := NewMockDecoderInterface(ctrl)
 	expr := NewMockExpression(ctrl)
 	builder := NewMockBuilderInterface(ctrl)
-	newBuilder := func() dynamorm.BuilderInterface {
-		return builder
-	}
+	newBuilder := func() dynamorm.BuilderInterface { return builder }
 	storage := dynamorm.NewStorage("TestTable", dynamo,
 		dynamorm.WithDecoder(dec),
 		dynamorm.WithBuilder(newBuilder))
