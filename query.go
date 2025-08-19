@@ -40,7 +40,7 @@ type QueryInterface interface {
 // and decoding items into Go structs.
 type Query struct {
 	client  DynamoDB
-	input   *Input
+	query   *dynamodb.QueryInput
 	scan    *dynamodb.ScanInput
 	output  *Output
 	decoder DecoderInterface
@@ -50,9 +50,9 @@ type Query struct {
 }
 
 // NewQuery creates a new Query instance from the query input and output.
-func NewQuery(client DynamoDB, input *Input, scan *dynamodb.ScanInput, output *Output, decoder DecoderInterface) *Query {
-	if input == nil {
-		input = &Input{}
+func NewQuery(client DynamoDB, query *dynamodb.QueryInput, scan *dynamodb.ScanInput, output *Output, decoder DecoderInterface) *Query {
+	if query == nil && scan == nil {
+		query = &dynamodb.QueryInput{}
 	}
 	if output == nil {
 		output = &Output{}
@@ -63,7 +63,7 @@ func NewQuery(client DynamoDB, input *Input, scan *dynamodb.ScanInput, output *O
 
 	return &Query{
 		client:  client,
-		input:   input,
+		query:   query,
 		scan:    scan,
 		output:  output,
 		decoder: decoder,
@@ -119,8 +119,6 @@ func (q *Query) NextPage(ctx context.Context) bool {
 		return false
 	}
 
-	q.input.ExclusiveStartKey = q.output.LastEvaluatedKey
-
 	if q.scan != nil {
 		q.scan.ExclusiveStartKey = q.output.LastEvaluatedKey
 		out, err := q.client.Scan(ctx, q.scan)
@@ -131,8 +129,8 @@ func (q *Query) NextPage(ctx context.Context) bool {
 		q.output = NewOutputFromScanOutput(out)
 
 	} else {
-		in := q.input.ToQueryInput()
-		out, err := q.client.Query(ctx, in)
+		q.query.ExclusiveStartKey = q.output.LastEvaluatedKey
+		out, err := q.client.Query(ctx, q.query)
 		if err != nil {
 			q.err = err
 			return false

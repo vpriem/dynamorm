@@ -613,22 +613,43 @@ func TestStorageQuery(t *testing.T) {
 		dynamo.EXPECT().
 			Query(context.TODO(), &dynamodb.QueryInput{
 				TableName:              aws.String("TestTable"),
-				KeyConditionExpression: aws.String("PK = :PK AND begins_with(SK, :SK)"),
-				FilterExpression:       aws.String("#IsActive = :IsActive"),
+				KeyConditionExpression: aws.String("#0 = :0"),
 				ExpressionAttributeValues: map[string]types.AttributeValue{
-					":PK":       &types.AttributeValueMemberS{Value: "pk-value"},
-					":SK":       &types.AttributeValueMemberS{Value: "sk-value"},
-					":IsActive": &types.AttributeValueMemberBOOL{Value: true},
+					":0": &types.AttributeValueMemberS{Value: "pk-value"},
 				},
 				ExpressionAttributeNames: map[string]string{
-					"#IsActive": "IsActive",
+					"#0": "PK",
 				},
 			}).
 			Return(out, nil)
 
+		query, err := storage.Query(context.TODO(), "pk-value", nil)
+		require.NoError(t, err)
+		require.NotNil(t, query)
+		require.Equal(t, int32(1), query.Count())
+	})
+
+	t.Run("should return query with options", func(t *testing.T) {
+		dynamo.EXPECT().
+			Query(context.TODO(), &dynamodb.QueryInput{
+				TableName:              aws.String("TestTable"),
+				KeyConditionExpression: aws.String("(#0 = :0) AND (#1 = :1)"),
+				ExpressionAttributeValues: map[string]types.AttributeValue{
+					":0": &types.AttributeValueMemberS{Value: "pk-value"},
+					":1": &types.AttributeValueMemberS{Value: "sk-value"},
+				},
+				ExpressionAttributeNames: map[string]string{
+					"#0": "PK",
+					"#1": "SK",
+				},
+				Limit: aws.Int32(1),
+			}).
+			Return(out, nil)
+
 		query, err := storage.Query(context.TODO(), "pk-value",
-			dynamorm.SkBeginsWith("sk-value"),
-			dynamorm.EQ("IsActive", true))
+			dynamorm.SkEQ("sk-value"),
+			dynamorm.QueryLimit(1),
+		)
 		require.NoError(t, err)
 		require.NotNil(t, query)
 		require.Equal(t, int32(1), query.Count())
@@ -639,16 +660,44 @@ func TestStorageQuery(t *testing.T) {
 			Query(context.TODO(), &dynamodb.QueryInput{
 				TableName:              aws.String("TestTable"),
 				IndexName:              aws.String("GSI1"),
-				KeyConditionExpression: aws.String("GSI1PK = :GSI1PK AND GSI1SK = :GSI1SK"),
+				KeyConditionExpression: aws.String("#0 = :0"),
 				ExpressionAttributeValues: map[string]types.AttributeValue{
-					":GSI1PK": &types.AttributeValueMemberS{Value: "gsi1-pk-value"},
-					":GSI1SK": &types.AttributeValueMemberS{Value: "gsi1-sk-value"},
+					":0": &types.AttributeValueMemberS{Value: "gsi1-pk-value"},
+				},
+				ExpressionAttributeNames: map[string]string{
+					"#0": "GSI1PK",
 				},
 			}).
 			Return(out, nil)
 
+		query, err := storage.QueryGSI1(context.TODO(), "gsi1-pk-value", nil)
+		require.NoError(t, err)
+		require.NotNil(t, query)
+		require.Equal(t, int32(1), query.Count())
+	})
+
+	t.Run("should query by GSI1 with options", func(t *testing.T) {
+		dynamo.EXPECT().
+			Query(context.TODO(), &dynamodb.QueryInput{
+				TableName:              aws.String("TestTable"),
+				IndexName:              aws.String("GSI1"),
+				KeyConditionExpression: aws.String("(#0 = :0) AND (#1 = :1)"),
+				ExpressionAttributeValues: map[string]types.AttributeValue{
+					":0": &types.AttributeValueMemberS{Value: "gsi1-pk-value"},
+					":1": &types.AttributeValueMemberS{Value: "gsi1-sk-value"},
+				},
+				ExpressionAttributeNames: map[string]string{
+					"#0": "GSI1PK",
+					"#1": "GSI1SK",
+				},
+				Limit: aws.Int32(1),
+			}).
+			Return(out, nil)
+
 		query, err := storage.QueryGSI1(context.TODO(), "gsi1-pk-value",
-			dynamorm.SkEQ("gsi1-sk-value"))
+			dynamorm.SkEQ("gsi1-sk-value"),
+			dynamorm.QueryLimit(1),
+		)
 		require.NoError(t, err)
 		require.NotNil(t, query)
 		require.Equal(t, int32(1), query.Count())
@@ -659,16 +708,17 @@ func TestStorageQuery(t *testing.T) {
 			Query(context.TODO(), &dynamodb.QueryInput{
 				TableName:              aws.String("TestTable"),
 				IndexName:              aws.String("GSI2"),
-				KeyConditionExpression: aws.String("GSI2PK = :GSI2PK AND GSI2SK = :GSI2SK"),
+				KeyConditionExpression: aws.String("#0 = :0"),
 				ExpressionAttributeValues: map[string]types.AttributeValue{
-					":GSI2PK": &types.AttributeValueMemberS{Value: "gsi2-pk-value"},
-					":GSI2SK": &types.AttributeValueMemberS{Value: "gsi2-sk-value"},
+					":0": &types.AttributeValueMemberS{Value: "gsi2-pk-value"},
+				},
+				ExpressionAttributeNames: map[string]string{
+					"#0": "GSI2PK",
 				},
 			}).
 			Return(out, nil)
 
-		query, err := storage.QueryGSI2(context.TODO(), "gsi2-pk-value",
-			dynamorm.SkEQ("gsi2-sk-value"))
+		query, err := storage.QueryGSI2(context.TODO(), "gsi2-pk-value", nil)
 		require.NoError(t, err)
 		require.NotNil(t, query)
 		require.Equal(t, int32(1), query.Count())

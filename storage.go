@@ -34,17 +34,17 @@ type StorageInterface interface {
 	// Query performs a query operation on the table using the partition key (PK).
 	// An optional SK condition can be provided to refine the query, as well as additional filters.
 	// It returns a QueryInterface for iterating through the results.
-	Query(ctx context.Context, pkValue string, skCond Condition, filters ...Filter) (QueryInterface, error)
+	Query(context.Context, string, SkCondition, ...QueryOption) (QueryInterface, error)
 
 	// QueryGSI1 performs a query operation on the Global Secondary Index 1.
 	// An optional SK condition can be provided to refine the query, as well as additional filters.
 	// It returns a QueryInterface for iterating through the results.
-	QueryGSI1(ctx context.Context, pkValue string, skCond Condition, filters ...Filter) (QueryInterface, error)
+	QueryGSI1(context.Context, string, SkCondition, ...QueryOption) (QueryInterface, error)
 
 	// QueryGSI2 performs a query operation on the Global Secondary Index 2.
 	// An optional SK condition can be provided to refine the query, as well as additional filters.
 	// It returns a QueryInterface for iterating through the results.
-	QueryGSI2(ctx context.Context, pkValue string, skCond Condition, filters ...Filter) (QueryInterface, error)
+	QueryGSI2(context.Context, string, SkCondition, ...QueryOption) (QueryInterface, error)
 
 	// Scan performs a scan operation on the table.
 	// Optional ScanOption(s) can customize the underlying ScanInput (e.g., limit, filter, projection).
@@ -270,29 +270,43 @@ func (s *Storage) Get(ctx context.Context, e Entity, opts ...GetOption) error {
 	return nil
 }
 
-func (s *Storage) Query(ctx context.Context, pk string, condition Condition, filters ...Filter) (QueryInterface, error) {
-	input := &Input{
-		TableName:              aws.String(s.table),
-		KeyConditionExpression: aws.String("PK = :PK"),
-		ExpressionAttributeValues: map[string]types.AttributeValue{
-			":PK": &types.AttributeValueMemberS{Value: pk},
-		},
+func (s *Storage) Query(ctx context.Context, pk string, cond SkCondition, opts ...QueryOption) (QueryInterface, error) {
+	input := &dynamodb.QueryInput{
+		TableName: aws.String(s.table),
 	}
 
-	if condition != nil {
-		condition("SK", input)
+	keyCond := expression.Key("PK").Equal(
+		expression.Value(pk),
+	)
+	if cond != nil {
+		keyCond = keyCond.And(cond("SK"))
 	}
 
-	return s.query(ctx, input, filters...)
+	return s.query(ctx, input, keyCond, opts...)
 }
 
-func (s *Storage) query(ctx context.Context, input *Input, filters ...Filter) (QueryInterface, error) {
-	for _, filter := range filters {
-		filter(input)
+func (s *Storage) query(ctx context.Context, input *dynamodb.QueryInput, keyCond expression.KeyConditionBuilder, opts ...QueryOption) (QueryInterface, error) {
+	builder := s.newBuilder().WithKeyCondition(keyCond)
+
+	for _, apply := range opts {
+		if apply != nil {
+			if b := apply(input, builder); b != nil {
+				builder = b
+			}
+		}
+	}
+	expr, err := builder.Build()
+	if err != nil {
+		return nil, err
 	}
 
-	in := input.ToQueryInput()
-	out, err := s.client.Query(ctx, in)
+	input.KeyConditionExpression = expr.KeyCondition()
+	input.FilterExpression = expr.Filter()
+	input.ProjectionExpression = expr.Projection()
+	input.ExpressionAttributeNames = expr.Names()
+	input.ExpressionAttributeValues = expr.Values()
+
+	out, err := s.client.Query(ctx, input)
 	if err != nil {
 		return nil, err
 	}
@@ -301,29 +315,30 @@ func (s *Storage) query(ctx context.Context, input *Input, filters ...Filter) (Q
 	return NewQuery(s.client, input, nil, output, s.decoder), nil
 }
 
-func (s *Storage) QueryGSI1(ctx context.Context, pk string, condition Condition, filters ...Filter) (QueryInterface, error) {
-	return s.queryGSI(ctx, "GSI1", pk, condition, filters...)
+func (s *Storage) QueryGSI1(ctx context.Context, pk string, cond SkCondition, opts ...QueryOption) (QueryInterface, error) {
+	return s.queryGSI(ctx, "GSI1", pk, cond, opts...)
 }
 
-func (s *Storage) QueryGSI2(ctx context.Context, pk string, condition Condition, filters ...Filter) (QueryInterface, error) {
-	return s.queryGSI(ctx, "GSI2", pk, condition, filters...)
+func (s *Storage) QueryGSI2(ctx context.Context, pk string, cond SkCondition, opts ...QueryOption) (QueryInterface, error) {
+	return s.queryGSI(ctx, "GSI2", pk, cond, opts...)
 }
 
-func (s *Storage) queryGSI(ctx context.Context, index, pk string, condition Condition, filters ...Filter) (QueryInterface, error) {
-	input := &Input{
-		TableName:              aws.String(s.table),
-		IndexName:              aws.String(index),
-		KeyConditionExpression: aws.String(fmt.Sprintf("%sPK = :%sPK", index, index)),
-		ExpressionAttributeValues: map[string]types.AttributeValue{
-			fmt.Sprintf(":%sPK", index): &types.AttributeValueMemberS{Value: pk},
-		},
+func (s *Storage) queryGSI(ctx context.Context, index, pk string, cond SkCondition, opts ...QueryOption) (QueryInterface, error) {
+	input := &dynamodb.QueryInput{
+		TableName: aws.String(s.table),
+		IndexName: aws.String(index),
 	}
 
-	if condition != nil {
-		condition(fmt.Sprintf("%sSK", index), input)
+	key := fmt.Sprintf("%sPK", index)
+	keyCond := expression.Key(key).Equal(
+		expression.Value(pk),
+	)
+	if cond != nil {
+		key = fmt.Sprintf("%sSK", index)
+		keyCond = keyCond.And(cond(key))
 	}
 
-	return s.query(ctx, input, filters...)
+	return s.query(ctx, input, keyCond, opts...)
 }
 
 func (s *Storage) Scan(ctx context.Context, opts ...ScanOption) (QueryInterface, error) {

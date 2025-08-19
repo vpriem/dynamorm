@@ -164,26 +164,43 @@ if err != nil {
 }
 
 // Get the last result of the current page
-user := &User{}
+user = &User{}
 err = query.Last(user)
 if err != nil {
     if errors.Is(err, dynamorm.ErrIndexOutOfRange) {
-    // No items on the current page
+        // No items on the current page
     }
 }
 
 // Query with filter conditions: GSI1PK=USER#EMAIL, begins_with(GSI1SK, "john@"), Name="John Doe"
-query, err := storage.QueryGSI1(ctx, "USER#EMAIL",
-	dynamorm.SkBeginsWith("john@"),
-	dynamorm.EQ("Name", "John Doe"))
+query, err = storage.QueryGSI1(
+    ctx,
+    "USER#EMAIL",
+    dynamorm.SkBeginsWith("john@"),
+    dynamorm.QueryFilter(expression.Name("Name").Equal(expression.Value("John Doe"))),
+)
 
 // Query with filter conditions: GSI1PK=USER#EMAIL, begins_with(GSI1SK, "john@"), Name="John Doe" OR Name="Jane Doe"
-query, err := storage.QueryGSI1(ctx, "USER#EMAIL",
-	dynamorm.SkBeginsWith("john@"),
-    dynamorm.OR(
-        dynamorm.EQ("Name", "John Doe"),
-        dynamorm.EQ("Name", "Jane Doe"),
-    ))
+query, err = storage.QueryGSI1(
+    ctx,
+    "USER#EMAIL",
+    dynamorm.SkBeginsWith("john@"),
+    dynamorm.QueryFilter(
+        expression.Or(
+            expression.Name("Name").Equal(expression.Value("John Doe")),
+            expression.Name("Name").Equal(expression.Value("Jane Doe")),
+        ),
+    ),
+)
+
+// Example: limit 10 results per page and sort descending on SK
+query, err = storage.Query(
+    ctx,
+    "USER#9be35b9b-e526-404f-8252-e14ce1cb9624",
+    nil, // no SK condition
+    dynamorm.QueryLimit(10),
+    dynamorm.QueryForward(false),
+)
 ```
 
 Note: `First()` and `Last()` operate on the current page of results. Use `NextPage(ctx)` to fetch subsequent pages.

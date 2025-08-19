@@ -217,7 +217,7 @@ func TestQueryPagination(t *testing.T) {
 	dynamo := NewMockDynamoDB(ctrl)
 	ctx := context.TODO()
 
-	in := &dynamorm.Input{
+	in := &dynamodb.QueryInput{
 		TableName: aws.String("Table"),
 	}
 

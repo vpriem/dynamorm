@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/vpriem/dynamorm"
@@ -62,9 +63,9 @@ func TestOrder(t *testing.T) {
 
 	t.Run("should find all orders by customer id", func(t *testing.T) {
 		pk := fmt.Sprintf("CUSTOMER#%s", cust.Id)
-		sk := dynamorm.SkBeginsWith("ORDER#")
+		skCond := dynamorm.SkBeginsWith("ORDER#")
 
-		query, err := storage.QueryGSI1(context.TODO(), pk, sk)
+		query, err := storage.QueryGSI1(context.TODO(), pk, skCond)
 		require.NoError(t, err)
 		require.Equal(t, int32(4), query.Count())
 
@@ -94,9 +95,9 @@ func TestOrder(t *testing.T) {
 		}
 
 		t.Run("using SK", func(t *testing.T) {
-			sk := dynamorm.SkBeginsWith("ORDER#STATUS#delivered")
+			skCond := dynamorm.SkBeginsWith("ORDER#STATUS#delivered")
 
-			q, err := storage.QueryGSI1(context.TODO(), pk, sk)
+			q, err := storage.QueryGSI1(context.TODO(), pk, skCond)
 			require.NoError(t, err)
 			require.Equal(t, int32(2), q.Count())
 
@@ -111,9 +112,12 @@ func TestOrder(t *testing.T) {
 		})
 
 		t.Run("using EQ", func(t *testing.T) {
-			sk := dynamorm.SkBeginsWith("ORDER#STATUS")
+			skCond := dynamorm.SkBeginsWith("ORDER#STATUS")
+			filter := expression.Name("Status").Equal(expression.Value("delivered"))
 
-			q, err := storage.QueryGSI1(context.TODO(), pk, sk, dynamorm.EQ("Status", "delivered"))
+			q, err := storage.QueryGSI1(context.TODO(), pk, skCond,
+				dynamorm.QueryFilter(filter),
+			)
 			require.NoError(t, err)
 			require.Equal(t, int32(2), q.Count())
 
@@ -130,7 +134,7 @@ func TestOrder(t *testing.T) {
 
 	t.Run("should find all orders by customer id with Status=payed,cancelled", func(t *testing.T) {
 		pk := fmt.Sprintf("CUSTOMER#%s", cust.Id)
-		sk := dynamorm.SkBeginsWith("ORDER#STATUS")
+		skCond := dynamorm.SkBeginsWith("ORDER#STATUS")
 
 		expected := []string{
 			ord1.Id.String(),
@@ -138,11 +142,14 @@ func TestOrder(t *testing.T) {
 		}
 
 		t.Run("using OR/EQ", func(t *testing.T) {
-			q, err := storage.QueryGSI1(context.TODO(), pk, sk,
-				dynamorm.OR(
-					dynamorm.EQ("Status", "payed"),
-					dynamorm.EQ("Status", "cancelled"),
-				))
+			filter := expression.Or(
+				expression.Name("Status").Equal(expression.Value("payed")),
+				expression.Name("Status").Equal(expression.Value("cancelled")),
+			)
+
+			q, err := storage.QueryGSI1(context.TODO(), pk, skCond,
+				dynamorm.QueryFilter(filter),
+			)
 			require.NoError(t, err)
 			require.Equal(t, int32(2), q.Count())
 
@@ -157,8 +164,14 @@ func TestOrder(t *testing.T) {
 		})
 
 		t.Run("using IN", func(t *testing.T) {
-			q, err := storage.QueryGSI1(context.TODO(), pk, sk,
-				dynamorm.IN("Status", "payed", "cancelled"))
+			filter := expression.Name("Status").In(
+				expression.Value("payed"),
+				expression.Value("cancelled"),
+			)
+
+			q, err := storage.QueryGSI1(context.TODO(), pk, skCond,
+				dynamorm.QueryFilter(filter),
+			)
 			require.NoError(t, err)
 			require.Equal(t, int32(2), q.Count())
 
