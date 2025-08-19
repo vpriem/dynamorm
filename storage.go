@@ -13,7 +13,6 @@ package dynamorm
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -125,20 +124,20 @@ func NewStorage(table string, client DynamoDB, optFns ...Option) *Storage {
 
 func (s *Storage) createItem(e Entity) (map[string]types.AttributeValue, error) {
 	if err := e.BeforeSave(); err != nil {
-		return nil, fmt.Errorf("failed to prepare save: %w", err)
+		return nil, fmt.Errorf("%w: %v", ErrEntityBeforeSave, err)
 	}
 
 	pk, sk := e.PkSk()
 	if pk == "" {
-		return nil, errors.New("entity pk is empty")
+		return nil, ErrEntityPkNotSet
 	}
 	if sk == "" {
-		return nil, errors.New("entity sk is empty")
+		return nil, ErrEntitySkNotSet
 	}
 
 	item, err := s.encoder.Encode(e)
 	if err != nil {
-		return nil, fmt.Errorf("failed to encode entity: %w", err)
+		return nil, fmt.Errorf("%w: %v", ErrEntityEncode, err)
 	}
 	item["PK"] = &types.AttributeValueMemberS{Value: pk}
 	item["SK"] = &types.AttributeValueMemberS{Value: sk}
@@ -193,7 +192,10 @@ func (s *Storage) Save(ctx context.Context, e Entity, opts ...SaveOption) error 
 	}
 
 	_, err = s.client.PutItem(ctx, input)
-	return err
+	if err != nil {
+		return NewClientError(err)
+	}
+	return nil
 }
 
 func (s *Storage) BatchSave(ctx context.Context, entities ...Entity) error {
@@ -222,10 +224,10 @@ func (s *Storage) BatchSave(ctx context.Context, entities ...Entity) error {
 func (s *Storage) Get(ctx context.Context, e Entity, opts ...GetOption) error {
 	pk, sk := e.PkSk()
 	if pk == "" {
-		return errors.New("entity pk is empty")
+		return ErrEntityPkNotSet
 	}
 	if sk == "" {
-		return errors.New("entity sk is empty")
+		return ErrEntitySkNotSet
 	}
 
 	input := &dynamodb.GetItemInput{
@@ -256,7 +258,7 @@ func (s *Storage) Get(ctx context.Context, e Entity, opts ...GetOption) error {
 
 	output, err := s.client.GetItem(ctx, input)
 	if err != nil {
-		return err
+		return NewClientError(err)
 	}
 
 	if output.Item == nil {
@@ -264,7 +266,7 @@ func (s *Storage) Get(ctx context.Context, e Entity, opts ...GetOption) error {
 	}
 
 	if err = s.decoder.Decode(output.Item, e); err != nil {
-		return fmt.Errorf("failed to decode entity: %w", err)
+		return fmt.Errorf("%w: %v", ErrEntityDecode, err)
 	}
 
 	return nil
@@ -308,7 +310,7 @@ func (s *Storage) query(ctx context.Context, input *dynamodb.QueryInput, keyCond
 
 	out, err := s.client.Query(ctx, input)
 	if err != nil {
-		return nil, err
+		return nil, NewClientError(err)
 	}
 	output := NewOutputFromQueryOutput(out)
 
@@ -380,7 +382,7 @@ func (s *Storage) scan(ctx context.Context, input *dynamodb.ScanInput, opts ...S
 
 	out, err := s.client.Scan(ctx, input)
 	if err != nil {
-		return nil, err
+		return nil, NewClientError(err)
 	}
 	output := NewOutputFromScanOutput(out)
 
@@ -399,10 +401,10 @@ func (s *Storage) scanGSI(ctx context.Context, index string, opts ...ScanOption)
 func (s *Storage) Update(ctx context.Context, e Entity, update expression.UpdateBuilder, opts ...UpdateOption) error {
 	pk, sk := e.PkSk()
 	if pk == "" {
-		return errors.New("entity pk is empty")
+		return ErrEntityPkNotSet
 	}
 	if sk == "" {
-		return errors.New("entity sk is empty")
+		return ErrEntitySkNotSet
 	}
 
 	input := &dynamodb.UpdateItemInput{
@@ -432,12 +434,12 @@ func (s *Storage) Update(ctx context.Context, e Entity, update expression.Update
 
 	out, err := s.client.UpdateItem(ctx, input)
 	if err != nil {
-		return err
+		return NewClientError(err)
 	}
 
 	if (input.ReturnValues == ALL_NEW || input.ReturnValues == UPDATED_NEW) && out.Attributes != nil {
 		if err := s.decoder.Decode(out.Attributes, e); err != nil {
-			return fmt.Errorf("failed to decode entity: %w", err)
+			return fmt.Errorf("%w: %v", ErrEntityDecode, err)
 		}
 	}
 
@@ -447,10 +449,10 @@ func (s *Storage) Update(ctx context.Context, e Entity, update expression.Update
 func (s *Storage) Remove(ctx context.Context, e Entity, opts ...RemoveOption) error {
 	pk, sk := e.PkSk()
 	if pk == "" {
-		return errors.New("entity pk is empty")
+		return ErrEntityPkNotSet
 	}
 	if sk == "" {
-		return errors.New("entity sk is empty")
+		return ErrEntitySkNotSet
 	}
 
 	input := &dynamodb.DeleteItemInput{
@@ -481,7 +483,10 @@ func (s *Storage) Remove(ctx context.Context, e Entity, opts ...RemoveOption) er
 	}
 
 	_, err := s.client.DeleteItem(ctx, input)
-	return err
+	if err != nil {
+		return NewClientError(err)
+	}
+	return nil
 }
 
 func (s *Storage) Transaction() TransactionInterface {
@@ -498,10 +503,10 @@ func (s *Storage) BatchRemove(ctx context.Context, entities ...Entity) error {
 	for _, e := range entities {
 		pk, sk := e.PkSk()
 		if pk == "" {
-			return errors.New("entity pk is empty")
+			return ErrEntityPkNotSet
 		}
 		if sk == "" {
-			return errors.New("entity sk is empty")
+			return ErrEntitySkNotSet
 		}
 
 		batches = append(batches, types.WriteRequest{
@@ -539,11 +544,11 @@ func (s *Storage) batchWrite(ctx context.Context, requests []types.WriteRequest)
 
 		output, err := s.client.BatchWriteItem(ctx, input)
 		if err != nil {
-			return err
+			return NewClientError(err)
 		}
 
 		if unprocessed, ok := output.UnprocessedItems[s.table]; ok && len(unprocessed) > 0 {
-			return fmt.Errorf("failed to process all items in batch")
+			return ErrBatch
 		}
 	}
 

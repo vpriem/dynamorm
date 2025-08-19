@@ -2,7 +2,6 @@ package dynamorm
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -66,30 +65,28 @@ func (tx *Transaction) Execute(ctx context.Context) error {
 	_, err := tx.client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{
 		TransactItems: tx.items,
 	})
-
-	return err
+	if err != nil {
+		return NewClientError(err)
+	}
+	return nil
 }
 
 func (tx *Transaction) AddSave(e Entity, opts ...SaveOption) error {
-	if tx.table == "" {
-		return errors.New("transaction table is not set")
-	}
-
 	if err := e.BeforeSave(); err != nil {
-		return fmt.Errorf("failed to prepare save: %w", err)
+		return fmt.Errorf("%w: %v", ErrEntityBeforeSave, err)
 	}
 
 	pk, sk := e.PkSk()
 	if pk == "" {
-		return errors.New("entity pk is empty")
+		return ErrEntityPkNotSet
 	}
 	if sk == "" {
-		return errors.New("entity sk is empty")
+		return ErrEntitySkNotSet
 	}
 
 	item, err := tx.encoder.Encode(e)
 	if err != nil {
-		return fmt.Errorf("failed to encode entity: %w", err)
+		return fmt.Errorf("%w: %v", ErrEntityEncode, err)
 	}
 	item["PK"] = &types.AttributeValueMemberS{Value: pk}
 	item["SK"] = &types.AttributeValueMemberS{Value: sk}
@@ -138,16 +135,12 @@ func (tx *Transaction) AddSave(e Entity, opts ...SaveOption) error {
 }
 
 func (tx *Transaction) AddUpdate(e Entity, update expression.UpdateBuilder, opts ...UpdateOption) error {
-	if tx.table == "" {
-		return errors.New("transaction table is not set")
-	}
-
 	pk, sk := e.PkSk()
 	if pk == "" {
-		return errors.New("entity pk is empty")
+		return ErrEntityPkNotSet
 	}
 	if sk == "" {
-		return errors.New("entity sk is empty")
+		return ErrEntitySkNotSet
 	}
 
 	builder := tx.newBuilder().WithUpdate(update)
@@ -180,16 +173,12 @@ func (tx *Transaction) AddUpdate(e Entity, update expression.UpdateBuilder, opts
 }
 
 func (tx *Transaction) AddRemove(e Entity, opts ...RemoveOption) error {
-	if tx.table == "" {
-		return errors.New("transaction table is not set")
-	}
-
 	pk, sk := e.PkSk()
 	if pk == "" {
-		return errors.New("entity pk is empty")
+		return ErrEntityPkNotSet
 	}
 	if sk == "" {
-		return errors.New("entity sk is empty")
+		return ErrEntitySkNotSet
 	}
 
 	input := &types.Delete{
@@ -224,16 +213,12 @@ func (tx *Transaction) AddRemove(e Entity, opts ...RemoveOption) error {
 }
 
 func (tx *Transaction) AddConditionCheck(e Entity, cond expression.ConditionBuilder) error {
-	if tx.table == "" {
-		return errors.New("transaction table is not set")
-	}
-
 	pk, sk := e.PkSk()
 	if pk == "" {
-		return errors.New("entity pk is empty")
+		return ErrEntityPkNotSet
 	}
 	if sk == "" {
-		return errors.New("entity sk is empty")
+		return ErrEntitySkNotSet
 	}
 
 	builder := tx.newBuilder().WithCondition(cond)

@@ -85,7 +85,7 @@ func (q *Query) First(e Entity) error {
 
 	item := q.output.Items[0]
 	if err := q.decoder.Decode(item, e); err != nil {
-		return fmt.Errorf("failed to decode entity: %w", err)
+		return fmt.Errorf("%w: %v", ErrEntityDecode, err)
 	}
 	return nil
 }
@@ -98,7 +98,7 @@ func (q *Query) Last(e Entity) error {
 
 	item := q.output.Items[length-1]
 	if err := q.decoder.Decode(item, e); err != nil {
-		return fmt.Errorf("failed to decode entity: %w", err)
+		return fmt.Errorf("%w: %v", ErrEntityDecode, err)
 	}
 	return nil
 }
@@ -123,7 +123,7 @@ func (q *Query) NextPage(ctx context.Context) bool {
 		q.scan.ExclusiveStartKey = q.output.LastEvaluatedKey
 		out, err := q.client.Scan(ctx, q.scan)
 		if err != nil {
-			q.err = err
+			q.err = NewClientError(err)
 			return false
 		}
 		q.output = NewOutputFromScanOutput(out)
@@ -132,7 +132,7 @@ func (q *Query) NextPage(ctx context.Context) bool {
 		q.query.ExclusiveStartKey = q.output.LastEvaluatedKey
 		out, err := q.client.Query(ctx, q.query)
 		if err != nil {
-			q.err = err
+			q.err = NewClientError(err)
 			return false
 		}
 		q.output = NewOutputFromQueryOutput(out)
@@ -152,7 +152,11 @@ func (q *Query) Decode(e Entity) error {
 		return ErrIndexOutOfRange
 	}
 
-	return q.decoder.Decode(q.output.Items[q.index-1], e)
+	if err := q.decoder.Decode(q.output.Items[q.index-1], e); err != nil {
+		return fmt.Errorf("%w: %v", ErrEntityDecode, err)
+	}
+
+	return nil
 }
 
 func (q *Query) Error() error {

@@ -148,7 +148,7 @@ func TestTransaction(t *testing.T) {
 			Return(nil, assert.AnError)
 
 		err := tx.Execute(context.TODO())
-		require.ErrorIs(t, err, assert.AnError)
+		require.ErrorIs(t, err, dynamorm.ErrClient)
 	})
 }
 
@@ -166,18 +166,11 @@ func TestTransactionAddSave(t *testing.T) {
 	e := NewMockEntity(ctrl)
 	cond := expression.AttributeExists(expression.Name("Attr"))
 
-	t.Run("empty table", func(t *testing.T) {
-		tx := dynamorm.NewTransaction("", dynamo, nil, newBuilder)
-		err := tx.AddSave(e)
-		require.EqualError(t, err, "transaction table is not set")
-	})
-
 	t.Run("BeforeSave error", func(t *testing.T) {
 		e.EXPECT().BeforeSave().Return(assert.AnError)
 
 		err := tx.AddSave(e)
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "failed to prepare save")
+		require.ErrorIs(t, err, dynamorm.ErrEntityBeforeSave)
 	})
 
 	t.Run("empty pk", func(t *testing.T) {
@@ -185,7 +178,7 @@ func TestTransactionAddSave(t *testing.T) {
 		e.EXPECT().PkSk().Return("", "SK")
 
 		err := tx.AddSave(e)
-		require.EqualError(t, err, "entity pk is empty")
+		require.ErrorIs(t, err, dynamorm.ErrEntityPkNotSet)
 	})
 
 	t.Run("empty sk", func(t *testing.T) {
@@ -193,7 +186,7 @@ func TestTransactionAddSave(t *testing.T) {
 		e.EXPECT().PkSk().Return("PK", "")
 
 		err := tx.AddSave(e)
-		require.EqualError(t, err, "entity sk is empty")
+		require.ErrorIs(t, err, dynamorm.ErrEntitySkNotSet)
 	})
 
 	t.Run("encode error", func(t *testing.T) {
@@ -259,24 +252,18 @@ func TestTransactionAddUpdate(t *testing.T) {
 		expression.Value("Value"),
 	)
 
-	t.Run("empty table", func(t *testing.T) {
-		tx := dynamorm.NewTransaction("", dynamo, nil, newBuilder)
-		err := tx.AddUpdate(e, update)
-		require.EqualError(t, err, "transaction table is not set")
-	})
-
 	t.Run("empty pk", func(t *testing.T) {
 		e.EXPECT().PkSk().Return("", "SK")
 
 		err := tx.AddUpdate(e, update)
-		require.EqualError(t, err, "entity pk is empty")
+		require.ErrorIs(t, err, dynamorm.ErrEntityPkNotSet)
 	})
 
 	t.Run("empty sk", func(t *testing.T) {
 		e.EXPECT().PkSk().Return("PK", "")
 
 		err := tx.AddUpdate(e, update)
-		require.EqualError(t, err, "entity sk is empty")
+		require.ErrorIs(t, err, dynamorm.ErrEntitySkNotSet)
 	})
 }
 
@@ -293,24 +280,18 @@ func TestTransactionAddRemove(t *testing.T) {
 	e := NewMockEntity(ctrl)
 	cond := expression.AttributeExists(expression.Name("Attr"))
 
-	t.Run("empty table", func(t *testing.T) {
-		tx := dynamorm.NewTransaction("", dynamo, nil, newBuilder)
-		err := tx.AddRemove(e)
-		require.EqualError(t, err, "transaction table is not set")
-	})
-
 	t.Run("empty pk", func(t *testing.T) {
 		e.EXPECT().PkSk().Return("", "SK")
 
 		err := tx.AddRemove(e)
-		require.EqualError(t, err, "entity pk is empty")
+		require.ErrorIs(t, err, dynamorm.ErrEntityPkNotSet)
 	})
 
 	t.Run("empty sk", func(t *testing.T) {
 		e.EXPECT().PkSk().Return("PK", "")
 
 		err := tx.AddRemove(e)
-		require.EqualError(t, err, "entity sk is empty")
+		require.ErrorIs(t, err, dynamorm.ErrEntitySkNotSet)
 	})
 
 	t.Run("with condition", func(t *testing.T) {
@@ -351,24 +332,18 @@ func TestTransactionAddConditionCheck(t *testing.T) {
 	e := NewMockEntity(ctrl)
 	cond := expression.AttributeExists(expression.Name("Attr"))
 
-	t.Run("empty table", func(t *testing.T) {
-		tx := dynamorm.NewTransaction("", dynamo, nil, newBuilder)
-		err := tx.AddConditionCheck(e, cond)
-		require.EqualError(t, err, "transaction table is not set")
-	})
-
 	t.Run("empty pk", func(t *testing.T) {
 		e.EXPECT().PkSk().Return("", "SK")
 
 		err := tx.AddConditionCheck(e, cond)
-		require.EqualError(t, err, "entity pk is empty")
+		require.ErrorIs(t, err, dynamorm.ErrEntityPkNotSet)
 	})
 
 	t.Run("empty sk", func(t *testing.T) {
 		e.EXPECT().PkSk().Return("PK", "")
 
 		err := tx.AddConditionCheck(e, cond)
-		require.EqualError(t, err, "entity sk is empty")
+		require.ErrorIs(t, err, dynamorm.ErrEntitySkNotSet)
 	})
 
 	t.Run("builder error", func(t *testing.T) {

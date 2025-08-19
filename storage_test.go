@@ -136,7 +136,7 @@ func TestStorageSave(t *testing.T) {
 		e.EXPECT().PkSk().Return("", "SK#1")
 
 		err := storage.Save(context.TODO(), e)
-		require.EqualError(t, err, "entity pk is empty")
+		require.ErrorIs(t, err, dynamorm.ErrEntityPkNotSet)
 	})
 
 	t.Run("should return error if sk is empty", func(t *testing.T) {
@@ -145,7 +145,7 @@ func TestStorageSave(t *testing.T) {
 		e.EXPECT().PkSk().Return("PK#1", "")
 
 		err := storage.Save(context.TODO(), e)
-		require.EqualError(t, err, "entity sk is empty")
+		require.ErrorIs(t, err, dynamorm.ErrEntitySkNotSet)
 	})
 
 	t.Run("should return error if BeforeSave fails", func(t *testing.T) {
@@ -153,7 +153,7 @@ func TestStorageSave(t *testing.T) {
 		e.EXPECT().BeforeSave().Return(assert.AnError)
 
 		err := storage.Save(context.TODO(), e)
-		require.ErrorIs(t, err, assert.AnError)
+		require.ErrorIs(t, err, dynamorm.ErrEntityBeforeSave)
 	})
 
 	t.Run("should return client error", func(t *testing.T) {
@@ -165,12 +165,18 @@ func TestStorageSave(t *testing.T) {
 
 		enc.EXPECT().Encode(e).Return(map[string]types.AttributeValue{}, nil)
 
+		ex := &types.ConditionalCheckFailedException{Message: aws.String("check failed")}
+
 		dynamo.EXPECT().
 			PutItem(gomock.Any(), gomock.Any()).
-			Return(&dynamodb.PutItemOutput{}, assert.AnError)
+			Return(nil, ex)
 
 		err := storage.Save(context.TODO(), e)
-		require.ErrorIs(t, err, assert.AnError)
+		require.ErrorIs(t, err, dynamorm.ErrClient)
+
+		var checkErr *types.ConditionalCheckFailedException
+		require.ErrorAs(t, err, &checkErr)
+		require.Equal(t, "check failed", *checkErr.Message)
 	})
 
 	t.Run("should return encode error", func(t *testing.T) {
@@ -181,7 +187,7 @@ func TestStorageSave(t *testing.T) {
 		enc.EXPECT().Encode(e).Return(nil, assert.AnError)
 
 		err := storage.Save(context.TODO(), e)
-		require.ErrorIs(t, err, assert.AnError)
+		require.ErrorIs(t, err, dynamorm.ErrEntityEncode)
 	})
 }
 
@@ -277,8 +283,7 @@ func TestStorageBatchSave(t *testing.T) {
 			}, nil)
 
 		err := storage.BatchSave(context.TODO(), e1, e2)
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "failed to process all items in batch")
+		require.ErrorIs(t, err, dynamorm.ErrBatch)
 	})
 
 	t.Run("should return error if empty pk", func(t *testing.T) {
@@ -289,7 +294,7 @@ func TestStorageBatchSave(t *testing.T) {
 		e2 := NewMockEntity(ctrl)
 
 		err := storage.BatchSave(context.TODO(), e1, e2)
-		require.EqualError(t, err, "entity pk is empty")
+		require.ErrorIs(t, err, dynamorm.ErrEntityPkNotSet)
 	})
 
 	t.Run("should return error if empty sk", func(t *testing.T) {
@@ -300,7 +305,7 @@ func TestStorageBatchSave(t *testing.T) {
 		e2 := NewMockEntity(ctrl)
 
 		err := storage.BatchSave(context.TODO(), e1, e2)
-		require.EqualError(t, err, "entity sk is empty")
+		require.ErrorIs(t, err, dynamorm.ErrEntitySkNotSet)
 	})
 
 	t.Run("should return error if BeforeSave fails", func(t *testing.T) {
@@ -310,7 +315,7 @@ func TestStorageBatchSave(t *testing.T) {
 		e2 := NewMockEntity(ctrl)
 
 		err := storage.BatchSave(context.TODO(), e1, e2)
-		require.ErrorIs(t, err, assert.AnError)
+		require.ErrorIs(t, err, dynamorm.ErrEntityBeforeSave)
 	})
 
 	t.Run("should return error if encode fails", func(t *testing.T) {
@@ -323,7 +328,7 @@ func TestStorageBatchSave(t *testing.T) {
 		enc.EXPECT().Encode(e1).Return(nil, assert.AnError)
 
 		err := storage.BatchSave(context.TODO(), e1, e2)
-		require.ErrorIs(t, err, assert.AnError)
+		require.ErrorIs(t, err, dynamorm.ErrEntityEncode)
 	})
 
 	t.Run("should return client error ", func(t *testing.T) {
@@ -346,7 +351,7 @@ func TestStorageBatchSave(t *testing.T) {
 			Return(nil, assert.AnError)
 
 		err := storage.BatchSave(context.TODO(), e1, e2)
-		require.ErrorIs(t, err, assert.AnError)
+		require.ErrorIs(t, err, dynamorm.ErrClient)
 	})
 }
 
@@ -416,8 +421,7 @@ func TestStorageBatchRemove(t *testing.T) {
 			}, nil)
 
 		err := storage.BatchRemove(context.TODO(), e1, e2)
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "failed to process all items in batch")
+		require.ErrorIs(t, err, dynamorm.ErrBatch)
 	})
 
 	t.Run("should return error if empty pk", func(t *testing.T) {
@@ -426,7 +430,7 @@ func TestStorageBatchRemove(t *testing.T) {
 
 		e2 := NewMockEntity(ctrl)
 		err := storage.BatchRemove(context.TODO(), e1, e2)
-		require.EqualError(t, err, "entity pk is empty")
+		require.ErrorIs(t, err, dynamorm.ErrEntityPkNotSet)
 	})
 
 	t.Run("should return error if empty sk", func(t *testing.T) {
@@ -435,7 +439,7 @@ func TestStorageBatchRemove(t *testing.T) {
 
 		e2 := NewMockEntity(ctrl)
 		err := storage.BatchRemove(context.TODO(), e1, e2)
-		require.EqualError(t, err, "entity sk is empty")
+		require.ErrorIs(t, err, dynamorm.ErrEntitySkNotSet)
 	})
 
 	t.Run("should return client error", func(t *testing.T) {
@@ -449,7 +453,7 @@ func TestStorageBatchRemove(t *testing.T) {
 			Return(nil, assert.AnError)
 
 		err := storage.BatchRemove(context.TODO(), e1, e2)
-		require.ErrorIs(t, err, assert.AnError)
+		require.ErrorIs(t, err, dynamorm.ErrClient)
 	})
 }
 
@@ -545,7 +549,7 @@ func TestStorageGet(t *testing.T) {
 		e.EXPECT().PkSk().Return("", "SK#1")
 
 		err := storage.Get(context.TODO(), e)
-		require.EqualError(t, err, "entity pk is empty")
+		require.ErrorIs(t, err, dynamorm.ErrEntityPkNotSet)
 	})
 
 	t.Run("should return error if sk is empty", func(t *testing.T) {
@@ -553,7 +557,7 @@ func TestStorageGet(t *testing.T) {
 		e.EXPECT().PkSk().Return("PK#1", "")
 
 		err := storage.Get(context.TODO(), e)
-		require.EqualError(t, err, "entity sk is empty")
+		require.ErrorIs(t, err, dynamorm.ErrEntitySkNotSet)
 	})
 
 	t.Run("should return client error", func(t *testing.T) {
@@ -565,7 +569,7 @@ func TestStorageGet(t *testing.T) {
 			Return(nil, assert.AnError)
 
 		err := storage.Get(context.TODO(), e)
-		require.ErrorIs(t, err, assert.AnError)
+		require.ErrorIs(t, err, dynamorm.ErrClient)
 	})
 
 	t.Run("should return decode error", func(t *testing.T) {
@@ -583,7 +587,7 @@ func TestStorageGet(t *testing.T) {
 		dec.EXPECT().Decode(out.Item, e).Return(assert.AnError)
 
 		err := storage.Get(context.TODO(), e)
-		require.ErrorIs(t, err, assert.AnError)
+		require.ErrorIs(t, err, dynamorm.ErrEntityDecode)
 	})
 
 	t.Run("should return builder error", func(t *testing.T) {
@@ -730,7 +734,7 @@ func TestStorageQuery(t *testing.T) {
 			Return(nil, assert.AnError)
 
 		query, err := storage.Query(context.TODO(), "PK#1", nil)
-		require.ErrorIs(t, err, assert.AnError)
+		require.ErrorIs(t, err, dynamorm.ErrClient)
 		require.Nil(t, query)
 	})
 }
@@ -801,7 +805,7 @@ func TestStorageScan(t *testing.T) {
 			Return(nil, assert.AnError)
 
 		_, err := storage.Scan(ctx)
-		require.ErrorIs(t, err, assert.AnError)
+		require.ErrorIs(t, err, dynamorm.ErrClient)
 	})
 }
 
@@ -873,7 +877,7 @@ func TestStorageGSI1(t *testing.T) {
 			Return(nil, assert.AnError)
 
 		_, err := storage.ScanGSI1(ctx)
-		require.ErrorIs(t, err, assert.AnError)
+		require.ErrorIs(t, err, dynamorm.ErrClient)
 	})
 }
 
@@ -945,7 +949,7 @@ func TestStorageGSI2(t *testing.T) {
 			Return(nil, assert.AnError)
 
 		_, err := storage.ScanGSI2(ctx)
-		require.ErrorIs(t, err, assert.AnError)
+		require.ErrorIs(t, err, dynamorm.ErrClient)
 	})
 }
 
@@ -986,7 +990,7 @@ func TestStorageRemove(t *testing.T) {
 		e.EXPECT().PkSk().Return("", "SK#1")
 
 		err := storage.Remove(context.TODO(), e)
-		require.EqualError(t, err, "entity pk is empty")
+		require.ErrorIs(t, err, dynamorm.ErrEntityPkNotSet)
 	})
 
 	t.Run("should return error if sk is empty", func(t *testing.T) {
@@ -994,7 +998,7 @@ func TestStorageRemove(t *testing.T) {
 		e.EXPECT().PkSk().Return("PK#1", "")
 
 		err := storage.Remove(context.TODO(), e)
-		require.EqualError(t, err, "entity sk is empty")
+		require.ErrorIs(t, err, dynamorm.ErrEntitySkNotSet)
 	})
 
 	t.Run("should return client error", func(t *testing.T) {
@@ -1006,7 +1010,7 @@ func TestStorageRemove(t *testing.T) {
 			Return(nil, assert.AnError)
 
 		err := storage.Remove(context.TODO(), e)
-		require.ErrorIs(t, err, assert.AnError)
+		require.ErrorIs(t, err, dynamorm.ErrClient)
 	})
 
 	t.Run("should remove entity with condition", func(t *testing.T) {
@@ -1146,7 +1150,7 @@ func TestStorageUpdate(t *testing.T) {
 		e.EXPECT().PkSk().Return("", "SK#1")
 
 		err := storage.Update(context.TODO(), e, update)
-		require.EqualError(t, err, "entity pk is empty")
+		require.ErrorIs(t, err, dynamorm.ErrEntityPkNotSet)
 	})
 
 	t.Run("should return error if sk is empty", func(t *testing.T) {
@@ -1154,7 +1158,7 @@ func TestStorageUpdate(t *testing.T) {
 		e.EXPECT().PkSk().Return("PK#1", "")
 
 		err := storage.Update(context.TODO(), e, update)
-		require.EqualError(t, err, "entity sk is empty")
+		require.ErrorIs(t, err, dynamorm.ErrEntitySkNotSet)
 	})
 
 	t.Run("should return client error", func(t *testing.T) {
@@ -1174,7 +1178,7 @@ func TestStorageUpdate(t *testing.T) {
 			Return(nil, assert.AnError)
 
 		err := storage.Update(context.TODO(), e, update)
-		require.ErrorIs(t, err, assert.AnError)
+		require.ErrorIs(t, err, dynamorm.ErrClient)
 	})
 
 	t.Run("should return builder error", func(t *testing.T) {

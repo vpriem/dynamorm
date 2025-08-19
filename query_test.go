@@ -83,7 +83,7 @@ func TestQueryFirst(t *testing.T) {
 		query := dynamorm.NewQuery(dynamo, nil, nil, output, dec)
 
 		err := query.First(nil)
-		require.ErrorIs(t, err, assert.AnError)
+		require.ErrorIs(t, err, dynamorm.ErrEntityDecode)
 	})
 }
 
@@ -135,7 +135,7 @@ func TestQueryLast(t *testing.T) {
 
 		query := dynamorm.NewQuery(dynamo, nil, nil, output, dec)
 		err := query.Last(nil)
-		require.ErrorIs(t, err, assert.AnError)
+		require.ErrorIs(t, err, dynamorm.ErrEntityDecode)
 	})
 }
 
@@ -206,7 +206,7 @@ func TestQueryIterator(t *testing.T) {
 
 		require.True(t, query.Next())
 		err := query.Decode(nil)
-		require.ErrorIs(t, err, assert.AnError)
+		require.ErrorIs(t, err, dynamorm.ErrEntityDecode)
 	})
 }
 
@@ -306,7 +306,7 @@ func TestQueryPagination(t *testing.T) {
 			}
 		}
 
-		require.ErrorIs(t, query.Error(), assert.AnError)
+		require.ErrorIs(t, query.Error(), dynamorm.ErrClient)
 		require.Equal(t, []string{
 			"usr0@go.dev",
 			"usr1@go.dev",
@@ -405,7 +405,7 @@ func TestScanPagination(t *testing.T) {
 			}
 		}
 
-		require.ErrorIs(t, query.Error(), assert.AnError)
+		require.ErrorIs(t, query.Error(), dynamorm.ErrClient)
 		require.Equal(t, []string{
 			"usr0@go.dev",
 		}, emails)
