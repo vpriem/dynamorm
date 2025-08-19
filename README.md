@@ -249,6 +249,22 @@ if err != nil {
 }
 ```
 
+### Batch Removing Entities
+
+```go
+// Remove multiple users by their keys
+u1 := &User{ID: uuid.MustParse("9be35b9b-e526-404f-8252-e14ce1cb9624")}
+u2 := &User{ID: uuid.MustParse("1aa0f2a6-3c68-4f7a-9a74-9a6e7d8c0f21")}
+
+// Batch remove all users (uses PkSk() on each entity)
+if err := storage.BatchRemove(ctx, u1, u2); err != nil {
+    // Handle error
+}
+```
+
+Note: DynamoDB's BatchWriteItem is limited to 25 items per request; larger inputs are automatically chunked.
+
+
 ### Transactions
 
 ```go

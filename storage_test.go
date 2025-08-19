@@ -350,6 +350,109 @@ func TestStorageBatchSave(t *testing.T) {
 	})
 }
 
+func TestStorageBatchRemove(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	t.Cleanup(ctrl.Finish)
+
+	dynamo := NewMockDynamoDB(ctrl)
+	storage := dynamorm.NewStorage("TestTable", dynamo)
+
+	t.Run("should remove none", func(t *testing.T) {
+		err := storage.BatchRemove(context.TODO())
+		require.NoError(t, err)
+	})
+
+	t.Run("should batch remove entities", func(t *testing.T) {
+		e1 := NewMockEntity(ctrl)
+		e1.EXPECT().PkSk().Return("PK#1", "SK#1")
+
+		e2 := NewMockEntity(ctrl)
+		e2.EXPECT().PkSk().Return("PK#2", "SK#2")
+
+		expectedBatch := []types.WriteRequest{
+			{
+				DeleteRequest: &types.DeleteRequest{
+					Key: map[string]types.AttributeValue{
+						"PK": &types.AttributeValueMemberS{Value: "PK#1"},
+						"SK": &types.AttributeValueMemberS{Value: "SK#1"},
+					},
+				},
+			},
+			{
+				DeleteRequest: &types.DeleteRequest{
+					Key: map[string]types.AttributeValue{
+						"PK": &types.AttributeValueMemberS{Value: "PK#2"},
+						"SK": &types.AttributeValueMemberS{Value: "SK#2"},
+					},
+				},
+			},
+		}
+
+		dynamo.EXPECT().
+			BatchWriteItem(gomock.Any(), &dynamodb.BatchWriteItemInput{
+				RequestItems: map[string][]types.WriteRequest{
+					"TestTable": expectedBatch,
+				},
+			}).
+			Return(&dynamodb.BatchWriteItemOutput{}, nil)
+
+		err := storage.BatchRemove(context.TODO(), e1, e2)
+		require.NoError(t, err)
+	})
+
+	t.Run("should return error with unprocessed items", func(t *testing.T) {
+		e1 := NewMockEntity(ctrl)
+		e1.EXPECT().PkSk().Return("PK#1", "SK#1")
+
+		e2 := NewMockEntity(ctrl)
+		e2.EXPECT().PkSk().Return("PK#2", "SK#2")
+
+		dynamo.EXPECT().
+			BatchWriteItem(gomock.Any(), gomock.Any()).
+			Return(&dynamodb.BatchWriteItemOutput{
+				UnprocessedItems: map[string][]types.WriteRequest{
+					"TestTable": {{}},
+				},
+			}, nil)
+
+		err := storage.BatchRemove(context.TODO(), e1, e2)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "failed to process all items in batch")
+	})
+
+	t.Run("should return error if empty pk", func(t *testing.T) {
+		e1 := NewMockEntity(ctrl)
+		e1.EXPECT().PkSk().Return("", "SK#1")
+
+		e2 := NewMockEntity(ctrl)
+		err := storage.BatchRemove(context.TODO(), e1, e2)
+		require.EqualError(t, err, "entity pk is empty")
+	})
+
+	t.Run("should return error if empty sk", func(t *testing.T) {
+		e1 := NewMockEntity(ctrl)
+		e1.EXPECT().PkSk().Return("PK#1", "")
+
+		e2 := NewMockEntity(ctrl)
+		err := storage.BatchRemove(context.TODO(), e1, e2)
+		require.EqualError(t, err, "entity sk is empty")
+	})
+
+	t.Run("should return client error", func(t *testing.T) {
+		e1 := NewMockEntity(ctrl)
+		e1.EXPECT().PkSk().Return("PK#1", "SK#1")
+		e2 := NewMockEntity(ctrl)
+		e2.EXPECT().PkSk().Return("PK#2", "SK#2")
+
+		dynamo.EXPECT().
+			BatchWriteItem(gomock.Any(), gomock.Any()).
+			Return(nil, assert.AnError)
+
+		err := storage.BatchRemove(context.TODO(), e1, e2)
+		require.ErrorIs(t, err, assert.AnError)
+	})
+}
+
 func TestStorageGet(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	t.Cleanup(ctrl.Finish)

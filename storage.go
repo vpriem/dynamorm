@@ -71,6 +71,11 @@ type StorageInterface interface {
 	// Note: DynamoDB limits BatchWriteItem to 25 items per request; larger inputs are chunked.
 	BatchSave(context.Context, ...Entity) error
 
+	// BatchRemove deletes one or more entities from DynamoDB using BatchWriteItem with DeleteRequests.
+	// It uses PkSk() for each entity to compute the key.
+	// Note: DynamoDB limits BatchWriteItem to 25 items per request; larger inputs are chunked.
+	BatchRemove(context.Context, ...Entity) error
+
 	// Update applies one or more update operations to an existing item identified by its PK/SK.
 	// If the operation returns attributes, they are decoded into the provided entity; otherwise, the entity is left unchanged.
 	Update(context.Context, Entity, expression.UpdateBuilder, ...UpdateOption) error
@@ -210,33 +215,7 @@ func (s *Storage) BatchSave(ctx context.Context, entities ...Entity) error {
 		})
 	}
 
-	const batchSize = 25
-
-	for i := 0; i < len(batches); i += batchSize {
-		end := i + batchSize
-		if end > len(batches) {
-			end = len(batches)
-		}
-
-		batch := batches[i:end]
-
-		input := &dynamodb.BatchWriteItemInput{
-			RequestItems: map[string][]types.WriteRequest{
-				s.table: batch,
-			},
-		}
-
-		output, err := s.client.BatchWriteItem(ctx, input)
-		if err != nil {
-			return err
-		}
-
-		if unprocessed, ok := output.UnprocessedItems[s.table]; ok && len(unprocessed) > 0 {
-			return fmt.Errorf("failed to process all items in batch")
-		}
-	}
-
-	return nil
+	return s.batchWrite(ctx, batches)
 }
 
 func (s *Storage) Get(ctx context.Context, e Entity) error {
@@ -459,4 +438,66 @@ func (s *Storage) Remove(ctx context.Context, e Entity, opts ...RemoveOption) er
 
 func (s *Storage) Transaction() TransactionInterface {
 	return NewTransaction(s.table, s.client, s.encoder, s.newBuilder)
+}
+
+func (s *Storage) BatchRemove(ctx context.Context, entities ...Entity) error {
+	if len(entities) == 0 {
+		return nil
+	}
+
+	batches := make([]types.WriteRequest, 0, len(entities))
+
+	for _, e := range entities {
+		pk, sk := e.PkSk()
+		if pk == "" {
+			return errors.New("entity pk is empty")
+		}
+		if sk == "" {
+			return errors.New("entity sk is empty")
+		}
+
+		batches = append(batches, types.WriteRequest{
+			DeleteRequest: &types.DeleteRequest{
+				Key: map[string]types.AttributeValue{
+					"PK": &types.AttributeValueMemberS{Value: pk},
+					"SK": &types.AttributeValueMemberS{Value: sk},
+				},
+			},
+		})
+	}
+
+	return s.batchWrite(ctx, batches)
+}
+
+func (s *Storage) batchWrite(ctx context.Context, requests []types.WriteRequest) error {
+	if len(requests) == 0 {
+		return nil
+	}
+
+	const batchSize = 25
+
+	for i := 0; i < len(requests); i += batchSize {
+		end := i + batchSize
+		if end > len(requests) {
+			end = len(requests)
+		}
+
+		batch := requests[i:end]
+		input := &dynamodb.BatchWriteItemInput{
+			RequestItems: map[string][]types.WriteRequest{
+				s.table: batch,
+			},
+		}
+
+		output, err := s.client.BatchWriteItem(ctx, input)
+		if err != nil {
+			return err
+		}
+
+		if unprocessed, ok := output.UnprocessedItems[s.table]; ok && len(unprocessed) > 0 {
+			return fmt.Errorf("failed to process all items in batch")
+		}
+	}
+
+	return nil
 }
