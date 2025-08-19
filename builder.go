@@ -15,6 +15,8 @@ type BuilderInterface interface {
 	Build() (Expression, error)
 }
 
+type CreateBuilder func() BuilderInterface
+
 type Builder struct {
 	builder expression.Builder
 }

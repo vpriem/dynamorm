@@ -79,15 +79,20 @@ type StorageInterface interface {
 	// It calls entity.PkSk() to determine how to delete the entity.
 	// Returns an error if the operation fails.
 	Remove(context.Context, Entity, ...RemoveOption) error
+
+	// Transaction creates a new Transaction to batch multiple write operations
+	// (put, update, delete) and execute them atomically.
+	// The returned transaction uses the same table as the storage instance.
+	Transaction() TransactionInterface
 }
 
 // Storage implements the StorageInterface for DynamoDB operations.
 type Storage struct {
-	table      string                  // DynamoDB table name
-	encoder    EncoderInterface        // Encoder for marshaling Go structs to DynamoDB items
-	decoder    DecoderInterface        // Decoder for unmarshaling DynamoDB items to Go structs
-	newBuilder func() BuilderInterface // BuilderInterface factory
-	client     DynamoDB                // DynamoDB client
+	table      string           // DynamoDB table name
+	encoder    EncoderInterface // Encoder for marshaling Go structs to DynamoDB items
+	decoder    DecoderInterface // Decoder for unmarshaling DynamoDB items to Go structs
+	newBuilder CreateBuilder    // BuilderInterface factory
+	client     DynamoDB         // DynamoDB client
 }
 
 // NewStorage creates a new Storage instance with the specified table name and DynamoDB client.
@@ -171,7 +176,6 @@ func (s *Storage) Save(ctx context.Context, e Entity, opts ...SaveOption) error 
 			}
 		}
 	}
-
 	if nextBuilder != nil {
 		expr, err := nextBuilder.Build()
 		if err != nil {
@@ -383,7 +387,6 @@ func (s *Storage) Update(ctx context.Context, e Entity, update expression.Update
 	}
 
 	builder := s.newBuilder().WithUpdate(update)
-
 	for _, apply := range opts {
 		if apply != nil {
 			if b := apply(input, builder); b != nil {
@@ -391,7 +394,6 @@ func (s *Storage) Update(ctx context.Context, e Entity, update expression.Update
 			}
 		}
 	}
-
 	expr, err := builder.Build()
 	if err != nil {
 		return err
@@ -434,7 +436,6 @@ func (s *Storage) Remove(ctx context.Context, e Entity, opts ...RemoveOption) er
 
 	builder := s.newBuilder()
 	var nextBuilder BuilderInterface
-
 	for _, apply := range opts {
 		if apply != nil {
 			if b := apply(input, builder); b != nil {
@@ -442,7 +443,6 @@ func (s *Storage) Remove(ctx context.Context, e Entity, opts ...RemoveOption) er
 			}
 		}
 	}
-
 	if nextBuilder != nil {
 		expr, err := nextBuilder.Build()
 		if err != nil {
@@ -455,4 +455,8 @@ func (s *Storage) Remove(ctx context.Context, e Entity, opts ...RemoveOption) er
 
 	_, err := s.client.DeleteItem(ctx, input)
 	return err
+}
+
+func (s *Storage) Transaction() TransactionInterface {
+	return NewTransaction(s.table, s.client, s.encoder, s.newBuilder)
 }

@@ -74,7 +74,9 @@ func TestStorageSave(t *testing.T) {
 		e.EXPECT().GSI1().Return("GSI1PK#1", "GSI1SK#1")
 		e.EXPECT().GSI2().Return("GSI2PK#1", "GSI2SK#1")
 
-		enc.EXPECT().Encode(e).Return(map[string]types.AttributeValue{}, nil)
+		enc.EXPECT().Encode(e).Return(map[string]types.AttributeValue{
+			"Attr": &types.AttributeValueMemberS{Value: "value"},
+		}, nil)
 
 		dynamo.EXPECT().
 			PutItem(context.TODO(), &dynamodb.PutItemInput{
@@ -86,6 +88,7 @@ func TestStorageSave(t *testing.T) {
 					"GSI1SK": &types.AttributeValueMemberS{Value: "GSI1SK#1"},
 					"GSI2PK": &types.AttributeValueMemberS{Value: "GSI2PK#1"},
 					"GSI2SK": &types.AttributeValueMemberS{Value: "GSI2SK#1"},
+					"Attr":   &types.AttributeValueMemberS{Value: "value"},
 				},
 			}).
 			Return(&dynamodb.PutItemOutput{}, nil)
@@ -937,5 +940,41 @@ func TestStorageUpdate(t *testing.T) {
 
 		err := storage.Update(context.TODO(), e, update)
 		require.ErrorIs(t, err, assert.AnError)
+	})
+}
+
+func TestStorageTransaction(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	t.Cleanup(ctrl.Finish)
+
+	dynamo := NewMockDynamoDB(ctrl)
+	storage := dynamorm.NewStorage("TestTable", dynamo)
+
+	t.Run("should create transaction and execute save", func(t *testing.T) {
+		e := NewMockEntity(ctrl)
+		e.EXPECT().BeforeSave().Return(nil)
+		e.EXPECT().PkSk().Return("PK#TX", "SK#TX")
+		e.EXPECT().GSI1().Return("", "")
+		e.EXPECT().GSI2().Return("", "")
+
+		dynamo.EXPECT().
+			TransactWriteItems(gomock.Any(), &dynamodb.TransactWriteItemsInput{
+				TransactItems: []types.TransactWriteItem{
+					{
+						Put: &types.Put{
+							TableName: aws.String("TestTable"),
+							Item: map[string]types.AttributeValue{
+								"PK": &types.AttributeValueMemberS{Value: "PK#TX"},
+								"SK": &types.AttributeValueMemberS{Value: "SK#TX"},
+							},
+						},
+					},
+				},
+			}).
+			Return(&dynamodb.TransactWriteItemsOutput{}, nil)
+
+		tx := storage.Transaction()
+		require.NoError(t, tx.AddSave(e))
+		require.NoError(t, tx.Execute(context.TODO()))
 	})
 }

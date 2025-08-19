@@ -226,7 +226,7 @@ err := storage.Update(ctx, user, upd,
     dynamorm.UpdateReturnValues(dynamorm.ALL_NEW),
 )
 if err != nil {
-    // handle error
+    // Handle error
 }
 ```
 
@@ -245,6 +245,29 @@ err := storage.Remove(ctx, user,
     dynamorm.RemoveCondition(cond),
 )
 if err != nil {
+    // Handle error
+}
+```
+
+### Transactions
+
+```go
+// Create a transaction from storage
+tx := storage.Transaction()
+
+// Queue multiple operations atomically
+_ = tx.AddSave(user1)
+_ = tx.AddConditionCheck(user2, expression.AttributeExists(
+	expression.Name("Name"),
+))
+_ = tx.AddUpdate(user2, expression.Set(
+    expression.Name("Name"),
+    expression.Value("John Doe Jr."),
+))
+_ = tx.AddRemove(user3)
+
+// Execute all operations
+if err := tx.Execute(ctx); err != nil {
     // Handle error
 }
 ```
