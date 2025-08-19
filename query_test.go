@@ -14,12 +14,12 @@ import (
 )
 
 func TestQueryInterface(t *testing.T) {
-	q := dynamorm.NewQuery(nil, nil, nil, nil)
+	q := dynamorm.NewQuery(nil, nil, nil, nil, nil)
 	var _ dynamorm.QueryInterface = q
 }
 
 func TestQueryCount(t *testing.T) {
-	q := dynamorm.NewQuery(nil, nil, nil, nil)
+	q := dynamorm.NewQuery(nil, nil, nil, nil, nil)
 	require.Equal(t, int32(0), q.Count())
 	require.Equal(t, int32(0), q.ScannedCount())
 
@@ -28,7 +28,7 @@ func TestQueryCount(t *testing.T) {
 		ScannedCount: 10,
 	}
 	output := dynamorm.NewOutputFromQueryOutput(out)
-	q = dynamorm.NewQuery(nil, nil, output, nil)
+	q = dynamorm.NewQuery(nil, nil, nil, output, nil)
 	require.Equal(t, int32(5), q.Count())
 	require.Equal(t, int32(10), q.ScannedCount())
 }
@@ -49,7 +49,7 @@ func TestQueryFirst(t *testing.T) {
 		}
 		output := dynamorm.NewOutputFromQueryOutput(out)
 
-		query := dynamorm.NewQuery(dynamo, nil, output, nil)
+		query := dynamorm.NewQuery(dynamo, nil, nil, output, nil)
 
 		e := &TestEntity{}
 		err := query.First(e)
@@ -63,7 +63,7 @@ func TestQueryFirst(t *testing.T) {
 		}
 		output := dynamorm.NewOutputFromQueryOutput(out)
 
-		query := dynamorm.NewQuery(dynamo, nil, output, nil)
+		query := dynamorm.NewQuery(dynamo, nil, nil, output, nil)
 
 		err := query.First(nil)
 		require.ErrorIs(t, err, dynamorm.ErrIndexOutOfRange)
@@ -80,7 +80,7 @@ func TestQueryFirst(t *testing.T) {
 		}
 		output := dynamorm.NewOutputFromQueryOutput(out)
 
-		query := dynamorm.NewQuery(dynamo, nil, output, dec)
+		query := dynamorm.NewQuery(dynamo, nil, nil, output, dec)
 
 		err := query.First(nil)
 		require.ErrorIs(t, err, assert.AnError)
@@ -103,7 +103,7 @@ func TestQueryLast(t *testing.T) {
 		}
 		output := dynamorm.NewOutputFromQueryOutput(out)
 
-		query := dynamorm.NewQuery(dynamo, nil, output, nil)
+		query := dynamorm.NewQuery(dynamo, nil, nil, output, nil)
 
 		e := &TestEntity{}
 		err := query.Last(e)
@@ -117,7 +117,7 @@ func TestQueryLast(t *testing.T) {
 		}
 		output := dynamorm.NewOutputFromQueryOutput(out)
 
-		query := dynamorm.NewQuery(dynamo, nil, output, nil)
+		query := dynamorm.NewQuery(dynamo, nil, nil, output, nil)
 		err := query.Last(nil)
 		require.ErrorIs(t, err, dynamorm.ErrIndexOutOfRange)
 	})
@@ -133,7 +133,7 @@ func TestQueryLast(t *testing.T) {
 		}
 		output := dynamorm.NewOutputFromQueryOutput(out)
 
-		query := dynamorm.NewQuery(dynamo, nil, output, dec)
+		query := dynamorm.NewQuery(dynamo, nil, nil, output, dec)
 		err := query.Last(nil)
 		require.ErrorIs(t, err, assert.AnError)
 	})
@@ -156,7 +156,7 @@ func TestQueryIterator(t *testing.T) {
 	output := dynamorm.NewOutputFromQueryOutput(out)
 
 	t.Run("should iterate through all items", func(t *testing.T) {
-		query := dynamorm.NewQuery(dynamo, nil, output, dec)
+		query := dynamorm.NewQuery(dynamo, nil, nil, output, dec)
 
 		dec.EXPECT().Decode(out.Items[0], &TestEntity{}).Return(nil)
 		dec.EXPECT().Decode(out.Items[1], &TestEntity{}).Return(nil)
@@ -176,7 +176,7 @@ func TestQueryIterator(t *testing.T) {
 	})
 
 	t.Run("should return ErrIndexOutOfRange", func(t *testing.T) {
-		query := dynamorm.NewQuery(dynamo, nil, output, dec)
+		query := dynamorm.NewQuery(dynamo, nil, nil, output, dec)
 
 		err := query.Decode(nil)
 		require.ErrorIs(t, err, dynamorm.ErrIndexOutOfRange)
@@ -190,7 +190,7 @@ func TestQueryIterator(t *testing.T) {
 	})
 
 	t.Run("should reset", func(t *testing.T) {
-		query := dynamorm.NewQuery(dynamo, nil, output, dec)
+		query := dynamorm.NewQuery(dynamo, nil, nil, output, dec)
 		for query.Next() {
 		}
 
@@ -200,7 +200,7 @@ func TestQueryIterator(t *testing.T) {
 	})
 
 	t.Run("should return decode error", func(t *testing.T) {
-		query := dynamorm.NewQuery(dynamo, nil, output, dec)
+		query := dynamorm.NewQuery(dynamo, nil, nil, output, dec)
 
 		dec.EXPECT().Decode(gomock.Any(), gomock.Any()).Return(assert.AnError)
 
@@ -249,7 +249,7 @@ func TestQueryPagination(t *testing.T) {
 
 	t.Run("should auto paginate", func(t *testing.T) {
 		output := dynamorm.NewOutputFromQueryOutput(out1)
-		query := dynamorm.NewQuery(dynamo, in, output, nil)
+		query := dynamorm.NewQuery(dynamo, in, nil, output, nil)
 
 		dynamo.EXPECT().
 			Query(ctx, &dynamodb.QueryInput{
@@ -287,7 +287,7 @@ func TestQueryPagination(t *testing.T) {
 
 	t.Run("should return auto paginate error ", func(t *testing.T) {
 		output := dynamorm.NewOutputFromQueryOutput(out1)
-		query := dynamorm.NewQuery(dynamo, in, output, nil)
+		query := dynamorm.NewQuery(dynamo, in, nil, output, nil)
 
 		dynamo.EXPECT().
 			Query(ctx, &dynamodb.QueryInput{
@@ -322,9 +322,8 @@ func TestScanPagination(t *testing.T) {
 	dynamo := NewMockDynamoDB(ctrl)
 	ctx := context.TODO()
 
-	in := &dynamorm.Input{
+	in := &dynamodb.ScanInput{
 		TableName: aws.String("Table"),
-		IsScan:    true,
 	}
 
 	out1 := &dynamodb.ScanOutput{
@@ -352,7 +351,7 @@ func TestScanPagination(t *testing.T) {
 
 	t.Run("should auto paginate", func(t *testing.T) {
 		output := dynamorm.NewOutputFromScanOutput(out1)
-		query := dynamorm.NewQuery(dynamo, in, output, nil)
+		query := dynamorm.NewQuery(dynamo, nil, in, output, nil)
 
 		dynamo.EXPECT().
 			Scan(ctx, &dynamodb.ScanInput{
@@ -387,7 +386,7 @@ func TestScanPagination(t *testing.T) {
 
 	t.Run("should return auto paginate error ", func(t *testing.T) {
 		output := dynamorm.NewOutputFromScanOutput(out1)
-		query := dynamorm.NewQuery(dynamo, in, output, nil)
+		query := dynamorm.NewQuery(dynamo, nil, in, output, nil)
 
 		dynamo.EXPECT().
 			Scan(ctx, &dynamodb.ScanInput{

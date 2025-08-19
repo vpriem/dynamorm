@@ -221,6 +221,48 @@ if err := query.Error(); err != nil {
 }
 ```
 
+### Scanning
+
+You can scan the whole table or a Global Secondary Index (GSI) and customize the underlying ScanInput via ScanOption(s):
+
+- `ScanFilter`: apply a filter condition to reduce items returned
+- `ScanAttribute`: limit the attributes returned (projection)
+- `ScanLimit`: control the page size (number of items evaluated per request)
+
+Example: scan table with a filter, limit 1 per page, and only fetch selected attributes:
+
+```go
+filter := expression.Name("IsActive").Equal(expression.Value(true))
+
+q, err := storage.Scan(ctx,
+    dynamorm.ScanFilter(filter),
+    dynamorm.ScanLimit(1),
+    dynamorm.ScanAttribute("ID", "Email"),
+)
+if err != nil { /* handle error */ }
+
+// Iterate across all pages
+for q.NextPage(ctx) {
+    for q.Next() {
+        var user User
+        if err := q.Decode(&user); err != nil { /* handle error */ }
+        // handle user
+    }
+}
+if err := q.Error(); err != nil { /* handle pagination error */ }
+```
+
+Scanning GSIs:
+
+```go
+// Scan GSI1
+q1, err := storage.ScanGSI1(ctx)
+
+// Scan GSI2 with a filter
+filter := expression.Name("Type").Equal(expression.Value("Customer"))
+q2, err := storage.ScanGSI2(ctx, dynamorm.ScanFilter(filter))
+```
+
 ### Updating an Entity
 
 ```go

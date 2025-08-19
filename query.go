@@ -3,6 +3,8 @@ package dynamorm
 import (
 	"context"
 	"fmt"
+
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 )
 
 // QueryInterface provides an interface to handle DynamoDB query results.
@@ -39,6 +41,7 @@ type QueryInterface interface {
 type Query struct {
 	client  DynamoDB
 	input   *Input
+	scan    *dynamodb.ScanInput
 	output  *Output
 	decoder DecoderInterface
 	index   int
@@ -47,7 +50,7 @@ type Query struct {
 }
 
 // NewQuery creates a new Query instance from the query input and output.
-func NewQuery(client DynamoDB, input *Input, output *Output, decoder DecoderInterface) *Query {
+func NewQuery(client DynamoDB, input *Input, scan *dynamodb.ScanInput, output *Output, decoder DecoderInterface) *Query {
 	if input == nil {
 		input = &Input{}
 	}
@@ -61,6 +64,7 @@ func NewQuery(client DynamoDB, input *Input, output *Output, decoder DecoderInte
 	return &Query{
 		client:  client,
 		input:   input,
+		scan:    scan,
 		output:  output,
 		decoder: decoder,
 	}
@@ -117,8 +121,9 @@ func (q *Query) NextPage(ctx context.Context) bool {
 
 	q.input.ExclusiveStartKey = q.output.LastEvaluatedKey
 
-	if in := q.input.ToScanInput(); in != nil {
-		out, err := q.client.Scan(ctx, in)
+	if q.scan != nil {
+		q.scan.ExclusiveStartKey = q.output.LastEvaluatedKey
+		out, err := q.client.Scan(ctx, q.scan)
 		if err != nil {
 			q.err = err
 			return false

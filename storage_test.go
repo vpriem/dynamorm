@@ -689,10 +689,13 @@ func TestStorageScan(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	t.Cleanup(ctrl.Finish)
 
+	expr := NewMockExpression(ctrl)
+	builder := NewMockBuilderInterface(ctrl)
+	newBuilder := func() dynamorm.BuilderInterface { return builder }
 	dynamo := NewMockDynamoDB(ctrl)
 	ctx := context.TODO()
 
-	storage := dynamorm.NewStorage("TestTable", dynamo)
+	storage := dynamorm.NewStorage("TestTable", dynamo, dynamorm.WithBuilder(newBuilder))
 
 	out := &dynamodb.ScanOutput{
 		Count: 1,
@@ -714,20 +717,30 @@ func TestStorageScan(t *testing.T) {
 	})
 
 	t.Run("should scan table with filter", func(t *testing.T) {
+		filter := expression.Name("Attr").Equal(expression.Value("value"))
+
+		names := map[string]string{}
+		values := map[string]types.AttributeValue{}
+
+		builder.EXPECT().WithFilter(filter).Return(builder)
+		builder.EXPECT().Build().Return(expr, nil)
+
+		expr.EXPECT().Filter().Return(aws.String("filter"))
+		expr.EXPECT().Projection().Return(aws.String("proj"))
+		expr.EXPECT().Names().Return(names)
+		expr.EXPECT().Values().Return(values)
+
 		dynamo.EXPECT().
 			Scan(context.TODO(), &dynamodb.ScanInput{
-				TableName:        aws.String("TestTable"),
-				FilterExpression: aws.String("#Email = :Email"),
-				ExpressionAttributeValues: map[string]types.AttributeValue{
-					":Email": &types.AttributeValueMemberS{Value: "usr1@go.dev"},
-				},
-				ExpressionAttributeNames: map[string]string{
-					"#Email": "Email",
-				},
+				TableName:                 aws.String("TestTable"),
+				FilterExpression:          aws.String("filter"),
+				ProjectionExpression:      aws.String("proj"),
+				ExpressionAttributeNames:  names,
+				ExpressionAttributeValues: values,
 			}).
 			Return(out, nil)
 
-		query, err := storage.Scan(ctx, dynamorm.EQ("Email", "usr1@go.dev"))
+		query, err := storage.Scan(ctx, dynamorm.ScanFilter(filter))
 		require.NoError(t, err)
 		require.Equal(t, int32(1), query.Count())
 	})
@@ -746,10 +759,13 @@ func TestStorageGSI1(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	t.Cleanup(ctrl.Finish)
 
+	expr := NewMockExpression(ctrl)
+	builder := NewMockBuilderInterface(ctrl)
+	newBuilder := func() dynamorm.BuilderInterface { return builder }
 	dynamo := NewMockDynamoDB(ctrl)
 	ctx := context.TODO()
 
-	storage := dynamorm.NewStorage("TestTable", dynamo)
+	storage := dynamorm.NewStorage("TestTable", dynamo, dynamorm.WithBuilder(newBuilder))
 
 	out := &dynamodb.ScanOutput{
 		Count: 1,
@@ -772,21 +788,31 @@ func TestStorageGSI1(t *testing.T) {
 	})
 
 	t.Run("should scan table with filter", func(t *testing.T) {
+		filter := expression.Name("Attr").Equal(expression.Value("value"))
+
+		names := map[string]string{}
+		values := map[string]types.AttributeValue{}
+
+		builder.EXPECT().WithFilter(filter).Return(builder)
+		builder.EXPECT().Build().Return(expr, nil)
+
+		expr.EXPECT().Filter().Return(aws.String("filter"))
+		expr.EXPECT().Projection().Return(aws.String("proj"))
+		expr.EXPECT().Names().Return(names)
+		expr.EXPECT().Values().Return(values)
+
 		dynamo.EXPECT().
 			Scan(context.TODO(), &dynamodb.ScanInput{
-				TableName:        aws.String("TestTable"),
-				IndexName:        aws.String("GSI1"),
-				FilterExpression: aws.String("#Email = :Email"),
-				ExpressionAttributeValues: map[string]types.AttributeValue{
-					":Email": &types.AttributeValueMemberS{Value: "usr1@go.dev"},
-				},
-				ExpressionAttributeNames: map[string]string{
-					"#Email": "Email",
-				},
+				TableName:                 aws.String("TestTable"),
+				IndexName:                 aws.String("GSI1"),
+				FilterExpression:          aws.String("filter"),
+				ProjectionExpression:      aws.String("proj"),
+				ExpressionAttributeNames:  names,
+				ExpressionAttributeValues: values,
 			}).
 			Return(out, nil)
 
-		query, err := storage.ScanGSI1(ctx, dynamorm.EQ("Email", "usr1@go.dev"))
+		query, err := storage.ScanGSI1(ctx, dynamorm.ScanFilter(filter))
 		require.NoError(t, err)
 		require.Equal(t, int32(1), query.Count())
 	})
@@ -805,10 +831,13 @@ func TestStorageGSI2(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	t.Cleanup(ctrl.Finish)
 
+	expr := NewMockExpression(ctrl)
+	builder := NewMockBuilderInterface(ctrl)
+	newBuilder := func() dynamorm.BuilderInterface { return builder }
 	dynamo := NewMockDynamoDB(ctrl)
 	ctx := context.TODO()
 
-	storage := dynamorm.NewStorage("TestTable", dynamo)
+	storage := dynamorm.NewStorage("TestTable", dynamo, dynamorm.WithBuilder(newBuilder))
 
 	out := &dynamodb.ScanOutput{
 		Count: 1,
@@ -831,21 +860,31 @@ func TestStorageGSI2(t *testing.T) {
 	})
 
 	t.Run("should scan table with filter", func(t *testing.T) {
+		filter := expression.Name("Attr").Equal(expression.Value("value"))
+
+		names := map[string]string{}
+		values := map[string]types.AttributeValue{}
+
+		builder.EXPECT().WithFilter(filter).Return(builder)
+		builder.EXPECT().Build().Return(expr, nil)
+
+		expr.EXPECT().Filter().Return(aws.String("filter"))
+		expr.EXPECT().Projection().Return(aws.String("proj"))
+		expr.EXPECT().Names().Return(names)
+		expr.EXPECT().Values().Return(values)
+
 		dynamo.EXPECT().
 			Scan(context.TODO(), &dynamodb.ScanInput{
-				TableName:        aws.String("TestTable"),
-				IndexName:        aws.String("GSI2"),
-				FilterExpression: aws.String("#Email = :Email"),
-				ExpressionAttributeValues: map[string]types.AttributeValue{
-					":Email": &types.AttributeValueMemberS{Value: "usr1@go.dev"},
-				},
-				ExpressionAttributeNames: map[string]string{
-					"#Email": "Email",
-				},
+				TableName:                 aws.String("TestTable"),
+				IndexName:                 aws.String("GSI2"),
+				FilterExpression:          aws.String("filter"),
+				ProjectionExpression:      aws.String("proj"),
+				ExpressionAttributeNames:  names,
+				ExpressionAttributeValues: values,
 			}).
 			Return(out, nil)
 
-		query, err := storage.ScanGSI2(ctx, dynamorm.EQ("Email", "usr1@go.dev"))
+		query, err := storage.ScanGSI2(ctx, dynamorm.ScanFilter(filter))
 		require.NoError(t, err)
 		require.Equal(t, int32(1), query.Count())
 	})

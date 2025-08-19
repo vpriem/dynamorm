@@ -47,19 +47,19 @@ type StorageInterface interface {
 	QueryGSI2(ctx context.Context, pkValue string, skCond Condition, filters ...Filter) (QueryInterface, error)
 
 	// Scan performs a scan operation on the table.
-	// Optional filters can be provided to refine the scan.
+	// Optional ScanOption(s) can customize the underlying ScanInput (e.g., limit, filter, projection).
 	// It returns a QueryInterface for iterating through the results.
-	Scan(ctx context.Context, filters ...Filter) (QueryInterface, error)
+	Scan(context.Context, ...ScanOption) (QueryInterface, error)
 
 	// ScanGSI1 performs a scan operation on the Global Secondary Index 1.
-	// Optional filters can be provided to refine the scan.
+	// Optional ScanOption(s) can customize the underlying ScanInput (e.g., limit, filter, projection).
 	// It returns a QueryInterface for iterating through the results.
-	ScanGSI1(ctx context.Context, filters ...Filter) (QueryInterface, error)
+	ScanGSI1(context.Context, ...ScanOption) (QueryInterface, error)
 
 	// ScanGSI2 performs a scan operation on the Global Secondary Index 2.
-	// Optional filters can be provided to refine the scan.
+	// Optional ScanOption(s) can customize the underlying ScanInput (e.g., limit, filter, projection).
 	// It returns a QueryInterface for iterating through the results.
-	ScanGSI2(ctx context.Context, filters ...Filter) (QueryInterface, error)
+	ScanGSI2(context.Context, ...ScanOption) (QueryInterface, error)
 
 	// Save persists a single entity to DynamoDB.
 	// It calls entity.PkSk() to populate PK and SK, and entity.GSI1() and entity.GSI2()
@@ -298,7 +298,7 @@ func (s *Storage) query(ctx context.Context, input *Input, filters ...Filter) (Q
 	}
 	output := NewOutputFromQueryOutput(out)
 
-	return NewQuery(s.client, input, output, s.decoder), nil
+	return NewQuery(s.client, input, nil, output, s.decoder), nil
 }
 
 func (s *Storage) QueryGSI1(ctx context.Context, pk string, condition Condition, filters ...Filter) (QueryInterface, error) {
@@ -326,45 +326,59 @@ func (s *Storage) queryGSI(ctx context.Context, index, pk string, condition Cond
 	return s.query(ctx, input, filters...)
 }
 
-func (s *Storage) Scan(ctx context.Context, filters ...Filter) (QueryInterface, error) {
-	input := &Input{
+func (s *Storage) Scan(ctx context.Context, opts ...ScanOption) (QueryInterface, error) {
+	input := &dynamodb.ScanInput{
 		TableName: aws.String(s.table),
 	}
 
-	return s.scan(ctx, input, filters...)
+	return s.scan(ctx, input, opts...)
 }
 
-func (s *Storage) ScanGSI1(ctx context.Context, filters ...Filter) (QueryInterface, error) {
-	return s.scanGSI(ctx, "GSI1", filters...)
+func (s *Storage) ScanGSI1(ctx context.Context, opts ...ScanOption) (QueryInterface, error) {
+	return s.scanGSI(ctx, "GSI1", opts...)
 }
 
-func (s *Storage) ScanGSI2(ctx context.Context, filters ...Filter) (QueryInterface, error) {
-	return s.scanGSI(ctx, "GSI2", filters...)
+func (s *Storage) ScanGSI2(ctx context.Context, opts ...ScanOption) (QueryInterface, error) {
+	return s.scanGSI(ctx, "GSI2", opts...)
 }
 
-func (s *Storage) scan(ctx context.Context, input *Input, filters ...Filter) (QueryInterface, error) {
-	for _, filter := range filters {
-		filter(input)
+func (s *Storage) scan(ctx context.Context, input *dynamodb.ScanInput, opts ...ScanOption) (QueryInterface, error) {
+	builder := s.newBuilder()
+	var nextBuilder BuilderInterface
+	for _, apply := range opts {
+		if apply != nil {
+			if b := apply(input, builder); b != nil {
+				nextBuilder = b
+			}
+		}
+	}
+	if nextBuilder != nil {
+		expr, err := nextBuilder.Build()
+		if err != nil {
+			return nil, err
+		}
+		input.FilterExpression = expr.Filter()
+		input.ProjectionExpression = expr.Projection()
+		input.ExpressionAttributeNames = expr.Names()
+		input.ExpressionAttributeValues = expr.Values()
 	}
 
-	input.IsScan = true
-	in := input.ToScanInput()
-	out, err := s.client.Scan(ctx, in)
+	out, err := s.client.Scan(ctx, input)
 	if err != nil {
 		return nil, err
 	}
 	output := NewOutputFromScanOutput(out)
 
-	return NewQuery(s.client, input, output, s.decoder), nil
+	return NewQuery(s.client, nil, input, output, s.decoder), nil
 }
 
-func (s *Storage) scanGSI(ctx context.Context, index string, filters ...Filter) (QueryInterface, error) {
-	input := &Input{
+func (s *Storage) scanGSI(ctx context.Context, index string, opts ...ScanOption) (QueryInterface, error) {
+	input := &dynamodb.ScanInput{
 		TableName: aws.String(s.table),
 		IndexName: aws.String(index),
 	}
 
-	return s.scan(ctx, input, filters...)
+	return s.scan(ctx, input, opts...)
 }
 
 func (s *Storage) Update(ctx context.Context, e Entity, update expression.UpdateBuilder, opts ...UpdateOption) error {

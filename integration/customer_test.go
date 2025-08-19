@@ -46,9 +46,11 @@ func TestCustomer(t *testing.T) {
 	})
 
 	t.Run("should find customer by id using SCAN and pagination", func(t *testing.T) {
+		filter := expression.Name("Id").Equal(expression.Value(cust1.Id.String()))
+
 		q, err := storage.Scan(context.TODO(),
-			dynamorm.EQ("Id", cust1.Id.String()),
-			dynamorm.Limit(1))
+			dynamorm.ScanFilter(filter),
+			dynamorm.ScanLimit(1))
 		require.NoError(t, err)
 
 		var found *Customer
