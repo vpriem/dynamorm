@@ -107,7 +107,7 @@ user2 := &User{ID: uuid.New(), Email: "user2@example.com", Name: "User Two"}
 user3 := &User{ID: uuid.New(), Email: "user3@example.com", Name: "User Three"}
 
 // Batch save all users
-err = storage.Save(ctx, user1, user2, user3)
+err = storage.BatchSave(ctx, user1, user2, user3)
 ```
 
 ### Querying

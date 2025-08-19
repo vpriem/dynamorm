@@ -60,11 +60,15 @@ type StorageInterface interface {
 	// It returns a QueryInterface for iterating through the results.
 	ScanGSI2(ctx context.Context, filters ...Filter) (QueryInterface, error)
 
-	// Save persists one or more entities to DynamoDB.
+	// Save persists a single entity to DynamoDB.
 	// It calls entity.PkSk() to populate PK and SK, and entity.GSI1() and entity.GSI2()
-	// to populate GSI PK and SK. If multiple entities are provided, a batch operation is performed.
-	// The BeforeSave() hook is called on each entity before saving.
-	Save(context.Context, ...Entity) error
+	// to populate GSI PK and SK. The BeforeSave() hook is called on the entity before saving.
+	Save(context.Context, Entity) error
+
+	// BatchSave persists one or more entities to DynamoDB using BatchWriteItem.
+	// It calls BeforeSave() and uses PkSk(), GSI1(), and GSI2() for each entity.
+	// Note: DynamoDB limits BatchWriteItem to 25 items per request; larger inputs are chunked.
+	BatchSave(context.Context, ...Entity) error
 
 	// Update applies one or more update operations to an existing item identified by its PK/SK.
 	// If the operation returns attributes, they are decoded into the provided entity; otherwise, the entity is left unchanged.
@@ -146,7 +150,7 @@ func (s *Storage) createItem(e Entity) (map[string]types.AttributeValue, error) 
 	return item, nil
 }
 
-func (s *Storage) save(ctx context.Context, e Entity) error {
+func (s *Storage) Save(ctx context.Context, e Entity) error {
 	item, err := s.createItem(e)
 	if err != nil {
 		return err
@@ -160,8 +164,12 @@ func (s *Storage) save(ctx context.Context, e Entity) error {
 	return err
 }
 
-func (s *Storage) saveBatch(ctx context.Context, entities []Entity) error {
-	writeRequests := make([]types.WriteRequest, 0, len(entities))
+func (s *Storage) BatchSave(ctx context.Context, entities ...Entity) error {
+	if len(entities) == 0 {
+		return nil
+	}
+
+	batches := make([]types.WriteRequest, 0, len(entities))
 
 	for _, e := range entities {
 		item, err := s.createItem(e)
@@ -169,7 +177,7 @@ func (s *Storage) saveBatch(ctx context.Context, entities []Entity) error {
 			return err
 		}
 
-		writeRequests = append(writeRequests, types.WriteRequest{
+		batches = append(batches, types.WriteRequest{
 			PutRequest: &types.PutRequest{
 				Item: item,
 			},
@@ -178,13 +186,13 @@ func (s *Storage) saveBatch(ctx context.Context, entities []Entity) error {
 
 	const batchSize = 25
 
-	for i := 0; i < len(writeRequests); i += batchSize {
+	for i := 0; i < len(batches); i += batchSize {
 		end := i + batchSize
-		if end > len(writeRequests) {
-			end = len(writeRequests)
+		if end > len(batches) {
+			end = len(batches)
 		}
 
-		batch := writeRequests[i:end]
+		batch := batches[i:end]
 
 		input := &dynamodb.BatchWriteItemInput{
 			RequestItems: map[string][]types.WriteRequest{
@@ -203,18 +211,6 @@ func (s *Storage) saveBatch(ctx context.Context, entities []Entity) error {
 	}
 
 	return nil
-}
-
-func (s *Storage) Save(ctx context.Context, entities ...Entity) error {
-	if len(entities) == 0 {
-		return nil
-	}
-
-	if len(entities) == 1 {
-		return s.save(ctx, entities[0])
-	}
-
-	return s.saveBatch(ctx, entities)
 }
 
 func (s *Storage) Get(ctx context.Context, e Entity) error {

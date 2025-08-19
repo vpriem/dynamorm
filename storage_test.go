@@ -27,7 +27,7 @@ func TestStorageSave(t *testing.T) {
 	})
 
 	t.Run("should save entity none", func(t *testing.T) {
-		err := storage.Save(context.TODO())
+		err := storage.BatchSave(context.TODO())
 		require.NoError(t, err)
 	})
 
@@ -139,7 +139,7 @@ func TestStorageSave(t *testing.T) {
 	})
 }
 
-func TestStorageInBatch(t *testing.T) {
+func TestStorageBatchSave(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	t.Cleanup(ctrl.Finish)
 
@@ -200,7 +200,7 @@ func TestStorageInBatch(t *testing.T) {
 			}).
 			Return(&dynamodb.BatchWriteItemOutput{}, nil)
 
-		err := storage.Save(context.TODO(), e1, e2)
+		err := storage.BatchSave(context.TODO(), e1, e2)
 		require.NoError(t, err)
 	})
 
@@ -230,7 +230,7 @@ func TestStorageInBatch(t *testing.T) {
 				},
 			}, nil)
 
-		err := storage.Save(context.TODO(), e1, e2)
+		err := storage.BatchSave(context.TODO(), e1, e2)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "failed to process all items in batch")
 	})
@@ -242,7 +242,7 @@ func TestStorageInBatch(t *testing.T) {
 
 		e2 := NewMockEntity(ctrl)
 
-		err := storage.Save(context.TODO(), e1, e2)
+		err := storage.BatchSave(context.TODO(), e1, e2)
 		require.EqualError(t, err, "entity pk is empty")
 	})
 
@@ -253,7 +253,7 @@ func TestStorageInBatch(t *testing.T) {
 
 		e2 := NewMockEntity(ctrl)
 
-		err := storage.Save(context.TODO(), e1, e2)
+		err := storage.BatchSave(context.TODO(), e1, e2)
 		require.EqualError(t, err, "entity sk is empty")
 	})
 
@@ -263,7 +263,7 @@ func TestStorageInBatch(t *testing.T) {
 
 		e2 := NewMockEntity(ctrl)
 
-		err := storage.Save(context.TODO(), e1, e2)
+		err := storage.BatchSave(context.TODO(), e1, e2)
 		require.ErrorIs(t, err, assert.AnError)
 	})
 
@@ -276,7 +276,7 @@ func TestStorageInBatch(t *testing.T) {
 
 		enc.EXPECT().Encode(e1).Return(nil, assert.AnError)
 
-		err := storage.Save(context.TODO(), e1, e2)
+		err := storage.BatchSave(context.TODO(), e1, e2)
 		require.ErrorIs(t, err, assert.AnError)
 	})
 
@@ -299,7 +299,7 @@ func TestStorageInBatch(t *testing.T) {
 			BatchWriteItem(gomock.Any(), gomock.Any()).
 			Return(nil, assert.AnError)
 
-		err := storage.Save(context.TODO(), e1, e2)
+		err := storage.BatchSave(context.TODO(), e1, e2)
 		require.ErrorIs(t, err, assert.AnError)
 	})
 }

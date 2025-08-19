@@ -27,7 +27,7 @@ func TestCustomer(t *testing.T) {
 			entities[i] = cust
 		}
 
-		err := storage.Save(context.TODO(), entities...)
+		err := storage.BatchSave(context.TODO(), entities...)
 		require.NoError(t, err)
 	})
 

@@ -26,7 +26,7 @@ func TestOrder(t *testing.T) {
 			entities[i] = ord
 		}
 
-		err := storage.Save(context.TODO(), entities...)
+		err := storage.BatchSave(context.TODO(), entities...)
 		require.NoError(t, err)
 	})
 
@@ -57,7 +57,7 @@ func TestOrder(t *testing.T) {
 	ord4.Status = "cancelled"
 	ord4.OrderedAt = now
 
-	err := storage.Save(context.TODO(), ord1, ord2, ord3, ord4)
+	err := storage.BatchSave(context.TODO(), ord1, ord2, ord3, ord4)
 	require.NoError(t, err)
 
 	t.Run("should find all orders by customer id", func(t *testing.T) {
