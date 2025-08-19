@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/stretchr/testify/assert"
@@ -706,6 +707,148 @@ func TestStorageRemove(t *testing.T) {
 			Return(nil, assert.AnError)
 
 		err := storage.Remove(context.TODO(), e)
+		require.ErrorIs(t, err, assert.AnError)
+	})
+}
+
+func TestStorageUpdate(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	t.Cleanup(ctrl.Finish)
+
+	dynamo := NewMockDynamoDB(ctrl)
+	dec := NewMockDecoderInterface(ctrl)
+	expr := NewMockExpression(ctrl)
+	builder := NewMockBuilderInterface(ctrl)
+	newBuilder := func() dynamorm.BuilderInterface {
+		return builder
+	}
+	storage := dynamorm.NewStorage("TestTable", dynamo,
+		dynamorm.WithDecoder(dec),
+		dynamorm.WithBuilder(newBuilder))
+
+	update := expression.Set(
+		expression.Name("Attr"),
+		expression.Value("Value"),
+	)
+	names := map[string]string{}
+	values := map[string]types.AttributeValue{}
+
+	t.Run("should update entity", func(t *testing.T) {
+		e := NewMockEntity(ctrl)
+		e.EXPECT().PkSk().Return("PK#1", "SK#1")
+
+		builder.EXPECT().WithUpdate(update).Return(builder)
+		builder.EXPECT().Build().Return(expr, nil)
+
+		expr.EXPECT().Names().Return(names)
+		expr.EXPECT().Values().Return(values)
+		expr.EXPECT().Update().Return(aws.String("update"))
+		expr.EXPECT().Condition().Return(aws.String("condition"))
+
+		dynamo.EXPECT().
+			UpdateItem(context.TODO(), &dynamodb.UpdateItemInput{
+				TableName: aws.String("TestTable"),
+				Key: map[string]types.AttributeValue{
+					"PK": &types.AttributeValueMemberS{Value: "PK#1"},
+					"SK": &types.AttributeValueMemberS{Value: "SK#1"},
+				},
+				UpdateExpression:          aws.String("update"),
+				ConditionExpression:       aws.String("condition"),
+				ExpressionAttributeNames:  names,
+				ExpressionAttributeValues: values,
+			}).
+			Return(&dynamodb.UpdateItemOutput{}, nil)
+
+		err := storage.Update(context.TODO(), e, update)
+		require.NoError(t, err)
+	})
+
+	t.Run("should update entity and decode into", func(t *testing.T) {
+		e := NewMockEntity(ctrl)
+		e.EXPECT().PkSk().Return("PK#1", "SK#1")
+
+		builder.EXPECT().WithUpdate(update).Return(builder)
+		builder.EXPECT().Build().Return(expr, nil)
+
+		expr.EXPECT().Names().Return(names)
+		expr.EXPECT().Values().Return(values)
+		expr.EXPECT().Update().Return(aws.String("update"))
+		expr.EXPECT().Condition().Return(aws.String("condition"))
+
+		out := &dynamodb.UpdateItemOutput{
+			Attributes: map[string]types.AttributeValue{
+				"Name": &types.AttributeValueMemberS{Value: "John"},
+				"Age":  &types.AttributeValueMemberN{Value: "30"},
+			},
+		}
+
+		dec.EXPECT().Decode(out.Attributes, e).Return(nil)
+
+		dynamo.EXPECT().
+			UpdateItem(context.TODO(), &dynamodb.UpdateItemInput{
+				TableName: aws.String("TestTable"),
+				Key: map[string]types.AttributeValue{
+					"PK": &types.AttributeValueMemberS{Value: "PK#1"},
+					"SK": &types.AttributeValueMemberS{Value: "SK#1"},
+				},
+				UpdateExpression:          aws.String("update"),
+				ConditionExpression:       aws.String("condition"),
+				ExpressionAttributeNames:  names,
+				ExpressionAttributeValues: values,
+				ReturnValues:              "ALL_NEW",
+			}).
+			Return(out, nil)
+
+		err := storage.Update(context.TODO(), e, update,
+			dynamorm.UpdateReturnValues(dynamorm.ALL_NEW),
+		)
+		require.NoError(t, err)
+	})
+
+	t.Run("should return error if pk is empty", func(t *testing.T) {
+		e := NewMockEntity(ctrl)
+		e.EXPECT().PkSk().Return("", "SK#1")
+
+		err := storage.Update(context.TODO(), e, update)
+		require.EqualError(t, err, "entity pk is empty")
+	})
+
+	t.Run("should return error if sk is empty", func(t *testing.T) {
+		e := NewMockEntity(ctrl)
+		e.EXPECT().PkSk().Return("PK#1", "")
+
+		err := storage.Update(context.TODO(), e, update)
+		require.EqualError(t, err, "entity sk is empty")
+	})
+
+	t.Run("should return client error", func(t *testing.T) {
+		e := NewMockEntity(ctrl)
+		e.EXPECT().PkSk().Return("PK#1", "SK#1")
+
+		builder.EXPECT().WithUpdate(gomock.Any()).Return(builder)
+		builder.EXPECT().Build().Return(expr, nil)
+
+		expr.EXPECT().Names().Return(names)
+		expr.EXPECT().Values().Return(values)
+		expr.EXPECT().Update().Return(aws.String("update"))
+		expr.EXPECT().Condition().Return(aws.String("condition"))
+
+		dynamo.EXPECT().
+			UpdateItem(gomock.Any(), gomock.Any()).
+			Return(nil, assert.AnError)
+
+		err := storage.Update(context.TODO(), e, update)
+		require.ErrorIs(t, err, assert.AnError)
+	})
+
+	t.Run("should return builder error", func(t *testing.T) {
+		e := NewMockEntity(ctrl)
+		e.EXPECT().PkSk().Return("PK#1", "SK#1")
+
+		builder.EXPECT().WithUpdate(gomock.Any()).Return(builder)
+		builder.EXPECT().Build().Return(nil, assert.AnError)
+
+		err := storage.Update(context.TODO(), e, update)
 		require.ErrorIs(t, err, assert.AnError)
 	})
 }

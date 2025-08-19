@@ -2,15 +2,17 @@ package dynamorm
 
 // Options contains configuration options for Storage.
 type Options struct {
-	Encoder EncoderInterface
-	Decoder DecoderInterface
+	Encoder    EncoderInterface
+	Decoder    DecoderInterface
+	NewBuilder func() BuilderInterface
 }
 
 // DefaultOptions creates default options for the storage, providing default encoder and decoder.
 func DefaultOptions() *Options {
 	return &Options{
-		Encoder: DefaultEncoder(),
-		Decoder: DefaultDecoder(),
+		Encoder:    DefaultEncoder(),
+		Decoder:    DefaultDecoder(),
+		NewBuilder: NewBuilder,
 	}
 }
 
@@ -31,6 +33,16 @@ func WithDecoder(d DecoderInterface) Option {
 	return func(cfg *Options) {
 		if d != nil {
 			cfg.Decoder = d
+		}
+	}
+}
+
+// WithBuilder allows providing a custom builder factory used by Storage to
+// create expression builders. Useful for testing or extending behavior.
+func WithBuilder(nb func() BuilderInterface) Option {
+	return func(cfg *Options) {
+		if nb != nil {
+			cfg.NewBuilder = nb
 		}
 	}
 }

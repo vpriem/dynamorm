@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/vpriem/dynamorm"
@@ -77,10 +78,34 @@ func TestCustomer(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, cust1.Id, found.Id)
 	})
+
+	t.Run("should update customer", func(t *testing.T) {
+		dst := &Customer{Id: cust1.Id}
+
+		update := expression.Set(
+			expression.Name("FirstName"),
+			expression.Value("Tacitus"),
+		).Set(
+			expression.Name("LastName"),
+			expression.Value("Kilgore"),
+		)
+
+		err := storage.Update(context.TODO(), dst, update,
+			dynamorm.UpdateReturnValues(dynamorm.ALL_NEW),
+		)
+		require.NoError(t, err)
+
+		require.Equal(t, cust1.Id, dst.Id)
+		require.Equal(t, cust1.Email, dst.Email)
+		require.Equal(t, "Tacitus", dst.FirstName)
+		require.Equal(t, "Kilgore", dst.LastName)
+	})
 }
 
 type Customer struct {
 	Id        uuid.UUID `fake:"{uuid}"`
+	FirstName string    `fake:"{firstname}"`
+	LastName  string    `fake:"{lastname}"`
 	Email     string    `fake:"{email}"`
 	UpdatedAt time.Time
 

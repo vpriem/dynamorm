@@ -17,6 +17,7 @@ import (
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
@@ -65,6 +66,10 @@ type StorageInterface interface {
 	// The BeforeSave() hook is called on each entity before saving.
 	Save(context.Context, ...Entity) error
 
+	// Update applies one or more update operations to an existing item identified by its PK/SK.
+	// If the operation returns attributes, they are decoded into the provided entity; otherwise, the entity is left unchanged.
+	Update(context.Context, Entity, expression.UpdateBuilder, ...UpdateOption) error
+
 	// Remove deletes an entity from DynamoDB by its PK/SK.
 	// It calls entity.PkSk() to determine how to delete the entity.
 	// Returns an error if the operation fails.
@@ -73,10 +78,11 @@ type StorageInterface interface {
 
 // Storage implements the StorageInterface for DynamoDB operations.
 type Storage struct {
-	table   string           // DynamoDB table name
-	encoder EncoderInterface // Encoder for marshaling Go structs to DynamoDB items
-	decoder DecoderInterface // Decoder for unmarshaling DynamoDB items to Go structs
-	client  DynamoDB         // DynamoDB client
+	table      string                  // DynamoDB table name
+	encoder    EncoderInterface        // Encoder for marshaling Go structs to DynamoDB items
+	decoder    DecoderInterface        // Decoder for unmarshaling DynamoDB items to Go structs
+	newBuilder func() BuilderInterface // BuilderInterface factory
+	client     DynamoDB                // DynamoDB client
 }
 
 // NewStorage creates a new Storage instance with the specified table name and DynamoDB client.
@@ -98,7 +104,7 @@ func NewStorage(table string, client DynamoDB, optFns ...Option) *Storage {
 		optFn(cfg)
 	}
 
-	return &Storage{table, cfg.Encoder, cfg.Decoder, client}
+	return &Storage{table, cfg.Encoder, cfg.Decoder, cfg.NewBuilder, client}
 }
 
 func (s *Storage) createItem(e Entity) (map[string]types.AttributeValue, error) {
@@ -339,6 +345,56 @@ func (s *Storage) scanGSI(ctx context.Context, index string, filters ...Filter) 
 	}
 
 	return s.scan(ctx, input, filters...)
+}
+
+func (s *Storage) Update(ctx context.Context, e Entity, update expression.UpdateBuilder, opts ...UpdateOption) error {
+	pk, sk := e.PkSk()
+	if pk == "" {
+		return errors.New("entity pk is empty")
+	}
+	if sk == "" {
+		return errors.New("entity sk is empty")
+	}
+
+	input := &dynamodb.UpdateItemInput{
+		TableName: aws.String(s.table),
+		Key: map[string]types.AttributeValue{
+			"PK": &types.AttributeValueMemberS{Value: pk},
+			"SK": &types.AttributeValueMemberS{Value: sk},
+		},
+	}
+
+	builder := s.newBuilder().WithUpdate(update)
+
+	for _, apply := range opts {
+		if apply != nil {
+			if b := apply(input, builder); b != nil {
+				builder = b
+			}
+		}
+	}
+
+	expr, err := builder.Build()
+	if err != nil {
+		return err
+	}
+	input.UpdateExpression = expr.Update()
+	input.ConditionExpression = expr.Condition()
+	input.ExpressionAttributeNames = expr.Names()
+	input.ExpressionAttributeValues = expr.Values()
+
+	out, err := s.client.UpdateItem(ctx, input)
+	if err != nil {
+		return err
+	}
+
+	if (input.ReturnValues == ALL_NEW || input.ReturnValues == UPDATED_NEW) && out.Attributes != nil {
+		if err := s.decoder.Decode(out.Attributes, e); err != nil {
+			return fmt.Errorf("failed to decode entity: %w", err)
+		}
+	}
+
+	return nil
 }
 
 func (s *Storage) Remove(ctx context.Context, e Entity) error {

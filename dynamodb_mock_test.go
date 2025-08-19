@@ -161,6 +161,26 @@ func (mr *MockDynamoDBMockRecorder) PutItem(arg0, arg1 any, arg2 ...any) *gomock
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutItem", reflect.TypeOf((*MockDynamoDB)(nil).PutItem), varargs...)
 }
 
+// UpdateItem mocks base method.
+func (m *MockDynamoDB) UpdateItem(arg0 context.Context, arg1 *dynamodb.UpdateItemInput, arg2 ...func(*dynamodb.Options)) (*dynamodb.UpdateItemOutput, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "UpdateItem", varargs...)
+	ret0, _ := ret[0].(*dynamodb.UpdateItemOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateItem indicates an expected call of UpdateItem.
+func (mr *MockDynamoDBMockRecorder) UpdateItem(arg0, arg1 any, arg2 ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateItem", reflect.TypeOf((*MockDynamoDB)(nil).UpdateItem), varargs...)
+}
+
 // Query mocks base method.
 func (m *MockDynamoDB) Query(arg0 context.Context, arg1 *dynamodb.QueryInput, arg2 ...func(*dynamodb.Options)) (*dynamodb.QueryOutput, error) {
 	m.ctrl.T.Helper()

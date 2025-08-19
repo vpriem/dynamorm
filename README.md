@@ -10,7 +10,7 @@ DynamORM is a lightweight, flexible Object-Relational Mapping (ORM) library for 
 
 - Simple, intuitive API for common DynamoDB operations
 - Type-safe mapping between Go structs and DynamoDB items
-- Support for primary keys and global secondary indexes
+- Support for primary keys and global secondary indexes (GSIs)
 - Composite primary key support and integrity
 - Flexible query and filtering capabilities
 - Lifecycle hooks for entities
@@ -88,7 +88,7 @@ user := &User{
     Name:  "John Doe",
 }
 
-// Save a user
+// Save the user
 err := storage.Save(ctx, user)
 ```
 
@@ -132,33 +132,33 @@ fmt.Printf("Found user: %v\n", user)
 #### Get Multiple Entities
 
 ```go
-// Find user using GSI1PK=USER#EMAIL GSI1SK=john@doe.com
+// Find a user using GSI1PK=USER#EMAIL, GSI1SK=john@doe.com
 query, err := storage.QueryGSI1(ctx, "USER#EMAIL", dynamorm.SkEQ("john@doe.com"))
 
-// Get first result of the current page
+// Get the first result of the current page
 user := &User{}
 err = query.First(user)
 if err != nil {
     if errors.Is(err, dynamorm.ErrIndexOutOfRange) {
-        // No items in the current page
+        // No items on the current page
     }
 }
 
-// Get last result of the current page
+// Get the last result of the current page
 user := &User{}
 err = query.Last(user)
 if err != nil {
     if errors.Is(err, dynamorm.ErrIndexOutOfRange) {
-    // No items in the current page
+    // No items on the current page
     }
 }
 
-// Query with filter conditions GSI1PK=USER#EMAIL begins_with(GSI1SK, "john@") Name="John Doe"
+// Query with filter conditions: GSI1PK=USER#EMAIL, begins_with(GSI1SK, "john@"), Name="John Doe"
 query, err := storage.QueryGSI1(ctx, "USER#EMAIL",
 	dynamorm.SkBeginsWith("john@"),
 	dynamorm.EQ("Name", "John Doe"))
 
-// Query with filter conditions GSI1PK=USER#EMAIL begins_with(GSI1SK, "john@") Name="John Doe" OR Name="Jane Doe"
+// Query with filter conditions: GSI1PK=USER#EMAIL, begins_with(GSI1SK, "john@"), Name="John Doe" OR Name="Jane Doe"
 query, err := storage.QueryGSI1(ctx, "USER#EMAIL",
 	dynamorm.SkBeginsWith("john@"),
     dynamorm.OR(
@@ -167,7 +167,7 @@ query, err := storage.QueryGSI1(ctx, "USER#EMAIL",
     ))
 ```
 
-Note: `First()` and `Last()` operate on the current page of results. Use NextPage(ctx) to fetch subsequent pages.
+Note: `First()` and `Last()` operate on the current page of results. Use `NextPage(ctx)` to fetch subsequent pages.
 
 #### Query Iterator
 
@@ -175,7 +175,7 @@ DynamoDB paginates query results by design. The `Next()` method iterates only th
 Similarly, the `Reset()` method only resets the iterator for the current page.
 
 ```go
-// Iterate through all items of current query result
+// Iterate through all items of the current query result
 for query.Next() {
     user := &User{}
     if err := query.Decode(user); err != nil {
@@ -202,7 +202,34 @@ if err := query.Error(); err != nil {
 }
 ```
 
-## Running tests
+### Updating an Entity
+
+```go
+user := &User{ID: uuid.MustParse("9be35b9b-e526-404f-8252-e14ce1cb9624")}
+
+// Build an update expression using AWS SDK expression
+upd := expression.Set(
+    expression.Name("Name"),
+    expression.Value("Jane Doe"),
+)
+
+// Build a condition expression
+cond := expression.AttributeExists(expression.Name("Name"))
+
+// Optionally add a condition and request returned attributes
+err := storage.Update(ctx, user, upd,
+    dynamorm.UpdateCondition(cond),
+    dynamorm.UpdateReturnValues(dynamorm.ALL_NEW),
+)
+if err != nil {
+    // handle error
+}
+```
+
+This updates specific attributes without overwriting the entire item.
+In this example, `dynamorm.ALL_NEW` returns the entire updated item; it will be decoded into the provided entity.
+
+## Running Tests
 
 - Unit tests: `make test`
 - Integration tests: `make integration` (requires Docker)
