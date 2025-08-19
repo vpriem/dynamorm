@@ -90,6 +90,10 @@ user := &User{
 
 // Save the user
 err := storage.Save(ctx, user)
+
+// Optionally, save with a condition (conditional write)
+cond := expression.AttributeNotExists(expression.Name("PK"))
+err = storage.Save(ctx, user, dynamorm.SaveCondition(cond))
 ```
 
 The entity will be stored in DynamoDB with the following structure:

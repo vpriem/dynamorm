@@ -20,7 +20,17 @@ func TestStorageSave(t *testing.T) {
 
 	dynamo := NewMockDynamoDB(ctrl)
 	enc := NewMockEncoderInterface(ctrl)
-	storage := dynamorm.NewStorage("TestTable", dynamo, dynamorm.WithEncoder(enc))
+	expr := NewMockExpression(ctrl)
+	builder := NewMockBuilderInterface(ctrl)
+	newBuilder := func() dynamorm.BuilderInterface { return builder }
+	storage := dynamorm.NewStorage("TestTable", dynamo,
+		dynamorm.WithEncoder(enc),
+		dynamorm.WithBuilder(newBuilder),
+	)
+
+	cond := expression.AttributeExists(expression.Name("Attr"))
+	names := map[string]string{}
+	values := map[string]types.AttributeValue{}
 
 	t.Run("should ensure interface", func(t *testing.T) {
 		var _ dynamorm.StorageInterface = storage
@@ -81,6 +91,39 @@ func TestStorageSave(t *testing.T) {
 			Return(&dynamodb.PutItemOutput{}, nil)
 
 		err := storage.Save(context.TODO(), e)
+		require.NoError(t, err)
+	})
+
+	t.Run("should save entity with condition", func(t *testing.T) {
+		e := NewMockEntity(ctrl)
+		e.EXPECT().BeforeSave().Return(nil)
+		e.EXPECT().PkSk().Return("PK#1", "SK#1")
+		e.EXPECT().GSI1().Return("", "")
+		e.EXPECT().GSI2().Return("", "")
+
+		enc.EXPECT().Encode(e).Return(map[string]types.AttributeValue{}, nil)
+
+		builder.EXPECT().WithCondition(cond).Return(builder)
+		builder.EXPECT().Build().Return(expr, nil)
+
+		expr.EXPECT().Names().Return(names)
+		expr.EXPECT().Values().Return(values)
+		expr.EXPECT().Condition().Return(aws.String("condition"))
+
+		dynamo.EXPECT().
+			PutItem(context.TODO(), &dynamodb.PutItemInput{
+				TableName: aws.String("TestTable"),
+				Item: map[string]types.AttributeValue{
+					"PK": &types.AttributeValueMemberS{Value: "PK#1"},
+					"SK": &types.AttributeValueMemberS{Value: "SK#1"},
+				},
+				ConditionExpression:       aws.String("condition"),
+				ExpressionAttributeNames:  names,
+				ExpressionAttributeValues: values,
+			}).
+			Return(&dynamodb.PutItemOutput{}, nil)
+
+		err := storage.Save(context.TODO(), e, dynamorm.SaveCondition(cond))
 		require.NoError(t, err)
 	})
 

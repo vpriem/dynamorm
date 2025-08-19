@@ -63,7 +63,8 @@ type StorageInterface interface {
 	// Save persists a single entity to DynamoDB.
 	// It calls entity.PkSk() to populate PK and SK, and entity.GSI1() and entity.GSI2()
 	// to populate GSI PK and SK. The BeforeSave() hook is called on the entity before saving.
-	Save(context.Context, Entity) error
+	// Optional SaveOption(s) can be provided, such as SaveCondition to apply a conditional write.
+	Save(context.Context, Entity, ...SaveOption) error
 
 	// BatchSave persists one or more entities to DynamoDB using BatchWriteItem.
 	// It calls BeforeSave() and uses PkSk(), GSI1(), and GSI2() for each entity.
@@ -150,17 +151,38 @@ func (s *Storage) createItem(e Entity) (map[string]types.AttributeValue, error) 
 	return item, nil
 }
 
-func (s *Storage) Save(ctx context.Context, e Entity) error {
+func (s *Storage) Save(ctx context.Context, e Entity, opts ...SaveOption) error {
 	item, err := s.createItem(e)
 	if err != nil {
 		return err
 	}
 
-	_, err = s.client.PutItem(ctx, &dynamodb.PutItemInput{
+	input := &dynamodb.PutItemInput{
 		TableName: aws.String(s.table),
 		Item:      item,
-	})
+	}
 
+	builder := s.newBuilder()
+	var nextBuilder BuilderInterface
+	for _, apply := range opts {
+		if apply != nil {
+			if b := apply(input, builder); b != nil {
+				nextBuilder = b
+			}
+		}
+	}
+
+	if nextBuilder != nil {
+		expr, err := nextBuilder.Build()
+		if err != nil {
+			return err
+		}
+		input.ConditionExpression = expr.Condition()
+		input.ExpressionAttributeNames = expr.Names()
+		input.ExpressionAttributeValues = expr.Values()
+	}
+
+	_, err = s.client.PutItem(ctx, input)
 	return err
 }
 
