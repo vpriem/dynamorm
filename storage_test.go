@@ -459,7 +459,12 @@ func TestStorageGet(t *testing.T) {
 
 	dynamo := NewMockDynamoDB(ctrl)
 	dec := NewMockDecoderInterface(ctrl)
-	storage := dynamorm.NewStorage("TestTable", dynamo, dynamorm.WithDecoder(dec))
+	expr := NewMockExpression(ctrl)
+	builder := NewMockBuilderInterface(ctrl)
+	newBuilder := func() dynamorm.BuilderInterface { return builder }
+	storage := dynamorm.NewStorage("TestTable", dynamo, dynamorm.WithDecoder(dec), dynamorm.WithBuilder(newBuilder))
+
+	names := map[string]string{}
 
 	t.Run("should return entity", func(t *testing.T) {
 		e := NewMockEntity(ctrl)
@@ -482,6 +487,44 @@ func TestStorageGet(t *testing.T) {
 		dec.EXPECT().Decode(out.Item, e).Return(nil)
 
 		err := storage.Get(context.TODO(), e)
+		require.NoError(t, err)
+	})
+
+	t.Run("should get with option", func(t *testing.T) {
+		e := NewMockEntity(ctrl)
+		e.EXPECT().PkSk().Return("PK#2", "SK#2")
+
+		builder.EXPECT().WithProjection(gomock.Any()).Return(builder)
+		builder.EXPECT().Build().Return(expr, nil)
+
+		expr.EXPECT().Projection().Return(aws.String("proj"))
+		expr.EXPECT().Names().Return(names)
+
+		out := &dynamodb.GetItemOutput{
+			Item: map[string]types.AttributeValue{},
+		}
+
+		expected := &dynamodb.GetItemInput{
+			TableName: aws.String("TestTable"),
+			Key: map[string]types.AttributeValue{
+				"PK": &types.AttributeValueMemberS{Value: "PK#2"},
+				"SK": &types.AttributeValueMemberS{Value: "SK#2"},
+			},
+			ConsistentRead:           aws.Bool(true),
+			ProjectionExpression:     aws.String("proj"),
+			ExpressionAttributeNames: names,
+		}
+
+		dynamo.EXPECT().
+			GetItem(context.TODO(), expected).
+			Return(out, nil)
+
+		dec.EXPECT().Decode(out.Item, e).Return(nil)
+
+		err := storage.Get(context.TODO(), e,
+			dynamorm.GetConsistent(true),
+			dynamorm.GetAttribute("Attr1", "Attr2"),
+		)
 		require.NoError(t, err)
 	})
 
@@ -540,6 +583,17 @@ func TestStorageGet(t *testing.T) {
 		dec.EXPECT().Decode(out.Item, e).Return(assert.AnError)
 
 		err := storage.Get(context.TODO(), e)
+		require.ErrorIs(t, err, assert.AnError)
+	})
+
+	t.Run("should return builder error", func(t *testing.T) {
+		e := NewMockEntity(ctrl)
+		e.EXPECT().PkSk().Return("PK#1", "SK#1")
+
+		builder.EXPECT().WithProjection(gomock.Any()).Return(builder)
+		builder.EXPECT().Build().Return(nil, assert.AnError)
+
+		err := storage.Get(context.TODO(), e, dynamorm.GetAttribute("Attr"))
 		require.ErrorIs(t, err, assert.AnError)
 	})
 }

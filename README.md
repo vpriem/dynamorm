@@ -133,6 +133,21 @@ if err != nil {
 fmt.Printf("Found user: %v\n", user)
 ```
 
+You can customize the underlying GetItem request via options:
+
+- Consistent read: perform a strongly consistent read
+- Projection: only fetch specific attributes
+
+```go
+// Strongly consistent read, and only fetch Name and Email attributes
+if err := storage.Get(ctx, user,
+    dynamorm.GetConsistent(true),
+    dynamorm.GetAttribute("Name", "Email"),
+); err != nil {
+    // handle error
+}
+```
+
 #### Get Multiple Entities
 
 ```go

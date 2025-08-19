@@ -27,8 +27,9 @@ import (
 type StorageInterface interface {
 	// Get retrieves an entity from DynamoDB by its partition key (PK) and sort key (SK).
 	// It calls entity.PkSk() to determine how to query the entity.
+	// Optional Get options can customize the underlying GetItemInput request.
 	// Returns ErrEntityNotFound if the item doesn't exist in the table.
-	Get(context.Context, Entity) error
+	Get(context.Context, Entity, ...GetOption) error
 
 	// Query performs a query operation on the table using the partition key (PK).
 	// An optional SK condition can be provided to refine the query, as well as additional filters.
@@ -218,7 +219,7 @@ func (s *Storage) BatchSave(ctx context.Context, entities ...Entity) error {
 	return s.batchWrite(ctx, batches)
 }
 
-func (s *Storage) Get(ctx context.Context, e Entity) error {
+func (s *Storage) Get(ctx context.Context, e Entity, opts ...GetOption) error {
 	pk, sk := e.PkSk()
 	if pk == "" {
 		return errors.New("entity pk is empty")
@@ -233,6 +234,24 @@ func (s *Storage) Get(ctx context.Context, e Entity) error {
 			"PK": &types.AttributeValueMemberS{Value: pk},
 			"SK": &types.AttributeValueMemberS{Value: sk},
 		},
+	}
+
+	builder := s.newBuilder()
+	var nextBuilder BuilderInterface
+	for _, apply := range opts {
+		if apply != nil {
+			if b := apply(input, builder); b != nil {
+				nextBuilder = b
+			}
+		}
+	}
+	if nextBuilder != nil {
+		expr, err := nextBuilder.Build()
+		if err != nil {
+			return err
+		}
+		input.ProjectionExpression = expr.Projection()
+		input.ExpressionAttributeNames = expr.Names()
 	}
 
 	output, err := s.client.GetItem(ctx, input)
